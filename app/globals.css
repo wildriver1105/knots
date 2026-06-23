@@ -1,0 +1,433 @@
+:root {
+  --bg-0: #0a131e;
+  --bg-1: #0f1d2c;
+  --bg-2: #16293c;
+  --panel: rgba(14, 28, 42, 0.72);
+  --panel-solid: #122334;
+  --stroke: rgba(120, 160, 200, 0.18);
+  --stroke-strong: rgba(140, 180, 220, 0.35);
+  --text: #e7eef6;
+  --text-dim: #9bb0c6;
+  --accent: #4aa3e0;
+  --accent-2: #f3c14a;
+  --shadow: 0 10px 34px rgba(0, 0, 0, 0.45);
+  --radius: 14px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+    "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  color: var(--text);
+  background:
+    radial-gradient(1200px 700px at 70% -10%, #1b3a52 0%, transparent 60%),
+    radial-gradient(900px 600px at 10% 110%, #102234 0%, transparent 55%),
+    linear-gradient(160deg, var(--bg-1), var(--bg-0));
+  background-attachment: fixed;
+}
+
+/* ── 레이아웃 ── */
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 20px 6px;
+  flex: 0 0 auto;
+}
+.brand {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.brand-mark {
+  font-size: 22px;
+}
+.brand-name {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+.brand-sub {
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+/* 본문: 좌측 레일 + 우측 무대 */
+.main {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  gap: 12px;
+  padding: 4px 14px;
+}
+.rail {
+  flex: 0 0 330px;
+  width: 330px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid var(--stroke);
+  background:
+    radial-gradient(800px 520px at 50% 30%, #1a3550 0%, transparent 70%),
+    linear-gradient(180deg, #10202f 0%, #0a141e 100%);
+}
+
+.stage canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  touch-action: none;
+}
+
+.canvas-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--text-dim);
+  font-size: 14px;
+}
+
+/* ── 오버레이(무대 위 컨트롤 바) ── */
+.overlay {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+}
+.overlay > * {
+  pointer-events: auto;
+}
+.overlay--bottom {
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  width: min(560px, calc(100% - 32px));
+}
+
+/* 매듭 설명 */
+.knot-blurb {
+  background: var(--panel);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  box-shadow: var(--shadow);
+}
+.knot-blurb h1 {
+  margin: 0 0 6px;
+  font-size: 19px;
+  font-weight: 700;
+}
+.knot-blurb p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+
+/* 모드 토글 */
+.mode-toggle {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.seg {
+  display: flex;
+  background: var(--panel);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--stroke);
+  border-radius: 12px;
+  padding: 3px;
+  box-shadow: var(--shadow);
+}
+.seg-btn {
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: all 0.16s;
+}
+.seg-btn--on {
+  background: var(--accent);
+  color: #06121d;
+}
+.dbg-btn {
+  border: 1px solid var(--stroke);
+  background: var(--panel);
+  color: var(--text-dim);
+  padding: 7px 10px;
+  font-size: 12px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.dbg-btn--on {
+  color: var(--accent-2);
+  border-color: var(--stroke-strong);
+}
+
+/* 단계 패널 */
+.step-panel {
+  background: var(--panel);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  box-shadow: var(--shadow);
+  min-height: 96px;
+}
+.step-eyebrow {
+  font-size: 11px;
+  letter-spacing: 1.2px;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+.step-title {
+  margin: 0 0 6px;
+  font-size: 20px;
+  font-weight: 700;
+}
+.step-instruction {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-dim);
+}
+
+/* 컨트롤 바 */
+.control-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--panel);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--stroke);
+  border-radius: 999px;
+  padding: 8px 14px;
+  box-shadow: var(--shadow);
+}
+.control-buttons {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.ctrl-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid var(--stroke);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: all 0.14s;
+}
+.ctrl-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+.ctrl-btn--primary {
+  width: 46px;
+  height: 46px;
+  background: var(--accent);
+  border-color: transparent;
+  color: #06121d;
+  font-size: 15px;
+}
+.ctrl-btn--primary:hover {
+  filter: brightness(1.08);
+}
+.scrubber {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 5px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  background-color: rgba(255, 255, 255, 0.12);
+  cursor: pointer;
+}
+.scrubber::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid var(--accent);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+.scrubber::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid var(--accent);
+}
+.step-counter {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+  min-width: 44px;
+  text-align: right;
+}
+
+/* 매듭 선택 */
+.knot-picker {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 10px;
+  padding: 8px 14px 14px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.knot-card {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 150px;
+  padding: 11px 13px;
+  border-radius: 12px;
+  border: 1px solid var(--stroke);
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.16s;
+}
+.knot-card:hover {
+  border-color: var(--stroke-strong);
+  transform: translateY(-2px);
+}
+.knot-card--active {
+  border-color: var(--accent);
+  background: linear-gradient(180deg, rgba(74, 163, 224, 0.18), var(--panel));
+}
+.knot-card__name {
+  font-size: 14px;
+  font-weight: 700;
+}
+.knot-card__diff {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.diff-1 {
+  background: rgba(91, 185, 140, 0.18);
+  color: #7fd6a6;
+}
+.diff-2 {
+  background: rgba(243, 193, 74, 0.18);
+  color: #f3c14a;
+}
+.diff-3 {
+  background: rgba(224, 88, 75, 0.18);
+  color: #f08a80;
+}
+
+/* 푸터 */
+.app-footer {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 22px 12px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.footer-phase2 {
+  opacity: 0.7;
+}
+
+/* ── 반응형(태블릿/좁은 화면) ── */
+@media (max-width: 900px) {
+  .main {
+    flex-direction: column;
+    gap: 10px;
+  }
+  .stage {
+    order: 1;
+    flex: 1 1 auto;
+    min-height: 44vh;
+  }
+  .rail {
+    order: 2;
+    flex: 0 0 auto;
+    width: 100%;
+    flex-direction: row;
+    overflow-x: auto;
+  }
+  .rail .knot-blurb {
+    flex: 0 0 60%;
+  }
+  .rail .step-panel {
+    flex: 1 1 auto;
+    min-width: 240px;
+  }
+  .brand-sub {
+    display: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .overlay--bottom {
+    width: calc(100% - 24px);
+  }
+  .rail {
+    flex-direction: column;
+  }
+  .rail .knot-blurb {
+    flex: 0 0 auto;
+  }
+  .ctrl-btn {
+    width: 34px;
+    height: 34px;
+  }
+  .app-footer {
+    flex-direction: column;
+    gap: 2px;
+    padding: 0 14px 10px;
+  }
+}
