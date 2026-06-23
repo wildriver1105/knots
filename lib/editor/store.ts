@@ -39,14 +39,23 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   activeStep: 0,
   selected: null,
 
-  startNew: (name) => set({ editing: true, draft: newCustomKnot(name), activeStep: 0, selected: null }),
-  startEdit: (knot) => set({ editing: true, draft: clone(knot), activeStep: 0, selected: null }),
+  startNew: (name) => {
+    const draft = newCustomKnot(name);
+    const mid = Math.floor((draft.poses?.[0]?.length ?? 2) / 2);
+    set({ editing: true, draft, activeStep: 0, selected: mid });
+  },
+  startEdit: (knot) => {
+    const d = clone(knot);
+    const mid = Math.floor((d.poses?.[0]?.length ?? 2) / 2);
+    set({ editing: true, draft: d, activeStep: 0, selected: mid });
+  },
   stop: () => set({ editing: false, draft: null, selected: null }),
 
   setActiveStep: (i) => {
     const d = get().draft;
     if (!d?.poses) return;
-    set({ activeStep: Math.min(d.poses.length - 1, Math.max(0, i)), selected: null });
+    // 선택점은 유지(점 개수가 스텝 간 동일) → 기즈모가 계속 보인다.
+    set({ activeStep: Math.min(d.poses.length - 1, Math.max(0, i)) });
   },
   select: (i) => set({ selected: i }),
 
