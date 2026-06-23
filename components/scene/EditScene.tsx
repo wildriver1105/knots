@@ -1,20 +1,36 @@
 "use client";
 
-// 에디터 3D: 현재 스텝의 줄 포즈를 튜브로 보여주고, 제어점을 클릭해 선택 → 기즈모로 드래그한다.
-// TransformControls 는 object prop 으로 핸들 메시에 "직접" 부착한다(자식 래핑 시 부모 그룹만
-// 움직여 로컬 좌표가 안 바뀌는 버그 방지). 드래그 → handle.position(=씬 좌표) → movePoint.
+// 에디터 3D: 제어점(마커)을 클릭 선택 → 기즈모로 드래그하면 그 스텝의 포즈가 바뀐다.
+// 줄(튜브)은 뷰와 동일하게 RopeSolver(텐션+자기충돌, 중력 0)로 정착시켜 그린다 → 에디터에서도
+// 가닥이 겹치지 않는다. 마커/기즈모는 "저작 좌표"(draft)에 있고, 튜브는 충돌 해소된 결과를 보여준다.
+//
+// TransformControls 는 object prop 으로 핸들에 직접 부착(자식 래핑 시 부모 그룹만 움직이는 버그 방지).
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState, useEffect } from "react";
+import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { TransformControls } from "@react-three/drei";
 import type { Vec3 } from "@/lib/knots/types";
 import { useEditorStore } from "@/lib/editor/store";
+import { RopeSolver, type SolverOpts } from "@/lib/knots/physics";
+import { getRopeTextures } from "./ropeTexture";
+
+const SOLVER: SolverOpts = { gravity: 0, damping: 0.85, spring: 0.4, iterations: 6, collisionIterations: 3 };
 
 function tube(points: Vec3[], radius: number): THREE.TubeGeometry | null {
   if (points.length < 2) return null;
   const v = points.map((p) => new THREE.Vector3(p[0], p[1], p[2]));
   const curve = new THREE.CatmullRomCurve3(v, false, "centripetal");
-  return new THREE.TubeGeometry(curve, Math.max(24, points.length * 8), radius, 20, false);
+  return new THREE.TubeGeometry(curve, Math.max(24, points.length * 8), radius, 22, false);
+}
+
+function setGeom(mesh: THREE.Mesh | null, pts: Vec3[], radius: number) {
+  if (!mesh) return;
+  const g = tube(pts, radius);
+  if (!g) return;
+  const old = mesh.geometry;
+  mesh.geometry = g;
+  old?.dispose();
 }
 
 export default function EditScene() {
@@ -28,27 +44,65 @@ export default function EditScene() {
   const points = draft?.poses?.[activeStep] ?? [];
   const r = draft?.ropeRadius ?? 0.075;
   const split = draft?.colorSplitIndex ?? -1;
+  const hasB = split > 0 && !!draft?.ropeColorB && split < points.length - 1;
 
-  const geomA = useMemo(() => tube(split > 0 ? points.slice(0, split + 1) : points, r), [points, split, r]);
-  const geomB = useMemo(() => (split > 0 ? tube(points.slice(split), r) : null), [points, split, r]);
+  const tex = useMemo(() => getRopeTextures(), []);
+  const solver = useMemo(() => new RopeSolver(r), [draft?.id, r, points.length]);
+  const mats = useMemo(
+    () => ({
+      A: new THREE.MeshStandardMaterial({
+        color: new THREE.Color(draft?.ropeColor ?? "#e0584b"),
+        roughness: 1,
+        metalness: 0,
+        roughnessMap: tex.roughnessMap,
+        normalMap: tex.normalMap,
+        normalScale: new THREE.Vector2(1.2, 1.2),
+      }),
+      B: new THREE.MeshStandardMaterial({
+        color: new THREE.Color(draft?.ropeColorB ?? "#3f8fce"),
+        roughness: 1,
+        metalness: 0,
+        roughnessMap: tex.roughnessMap,
+        normalMap: tex.normalMap,
+        normalScale: new THREE.Vector2(1.2, 1.2),
+      }),
+    }),
+    [draft?.ropeColor, draft?.ropeColorB, tex]
+  );
+
+  const tubeARef = useRef<THREE.Mesh>(null);
+  const tubeBRef = useRef<THREE.Mesh>(null);
+
+  useEffect(() => {
+    return () => {
+      tubeARef.current?.geometry?.dispose();
+      tubeBRef.current?.geometry?.dispose();
+    };
+  }, [draft?.id]);
+
+  useFrame((_, dt) => {
+    if (points.length < 2) return;
+    const result = solver.step([points], dt, SOLVER);
+    const settled = result[0];
+    if (hasB) {
+      if (tubeBRef.current) tubeBRef.current.visible = true;
+      setGeom(tubeARef.current, settled.slice(0, split + 1), r);
+      setGeom(tubeBRef.current, settled.slice(split), r);
+    } else {
+      if (tubeBRef.current) tubeBRef.current.visible = false;
+      setGeom(tubeARef.current, settled, r);
+    }
+  });
 
   if (!draft) return null;
   const selPoint = selected != null ? points[selected] : null;
 
   return (
     <group>
-      {geomA && (
-        <mesh geometry={geomA} castShadow receiveShadow>
-          <meshStandardMaterial color={draft.ropeColor} roughness={0.7} metalness={0} />
-        </mesh>
-      )}
-      {geomB && (
-        <mesh geometry={geomB} castShadow receiveShadow>
-          <meshStandardMaterial color={draft.ropeColorB ?? draft.ropeColor} roughness={0.7} metalness={0} />
-        </mesh>
-      )}
+      <mesh ref={tubeARef} material={mats.A} castShadow receiveShadow />
+      <mesh ref={tubeBRef} material={mats.B} castShadow receiveShadow />
 
-      {/* 제어점 마커(선택된 점 제외 — 거긴 핸들이 대신) */}
+      {/* 제어점 마커(선택 점 제외) — 저작 좌표 */}
       {points.map((p, i) =>
         i === selected ? null : (
           <mesh
@@ -72,6 +126,7 @@ export default function EditScene() {
               emissive={i === 0 ? "#22c55e" : i === points.length - 1 ? "#3b82f6" : i === split ? "#a855f7" : "#7d8a99"}
               emissiveIntensity={0.45}
               roughness={0.4}
+              depthTest={false}
             />
           </mesh>
         )
@@ -79,9 +134,9 @@ export default function EditScene() {
 
       {/* 선택된 점 = 드래그 핸들 */}
       {selPoint && (
-        <mesh ref={setHandle} position={selPoint as THREE.Vector3Tuple}>
+        <mesh ref={setHandle} position={selPoint as THREE.Vector3Tuple} renderOrder={999}>
           <sphereGeometry args={[r * 1.9, 20, 20]} />
-          <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={0.5} />
+          <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={0.5} depthTest={false} />
         </mesh>
       )}
       {selPoint && handle && (
@@ -90,6 +145,10 @@ export default function EditScene() {
           mode="translate"
           size={1.5}
           onObjectChange={() => {
+            if (selected == null) return;
+            movePoint(selected, [handle.position.x, handle.position.y, handle.position.z]);
+          }}
+          onMouseUp={() => {
             if (selected == null) return;
             movePoint(selected, [handle.position.x, handle.position.y, handle.position.z]);
           }}

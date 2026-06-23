@@ -4,7 +4,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { usePlayerStore } from "@/lib/player/store";
-import { getKnot } from "@/lib/knots/data";
+import { getKnot } from "@/lib/knots/registry";
 import { progressToStepIndex } from "@/lib/knots/interpolate";
 
 export default function StepPanel() {

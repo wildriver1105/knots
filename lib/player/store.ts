@@ -5,7 +5,8 @@
 // 스토어에는 입력 로직도, three/DOM 의존도 없다 → 테스트·재사용이 쉽다.
 
 import { create } from "zustand";
-import { getKnot, DEFAULT_KNOT_ID } from "@/lib/knots/data";
+import { DEFAULT_KNOT_ID } from "@/lib/knots/data";
+import { getKnot } from "@/lib/knots/registry";
 import { progressToStepIndex, stepIndexToProgress } from "@/lib/knots/interpolate";
 
 export type PlayMode = "step" | "continuous";

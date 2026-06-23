@@ -11,7 +11,7 @@ import { useMemo, useEffect, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import type { Vec3 } from "@/lib/knots/types";
-import { getKnot } from "@/lib/knots/data";
+import { getKnot } from "@/lib/knots/registry";
 import { buildLoose, knotShape, sliceCurve, interpolatePoses } from "@/lib/knots/interpolate";
 import { RopeSolver, type SolverOpts } from "@/lib/knots/physics";
 import { usePlayerStore } from "@/lib/player/store";

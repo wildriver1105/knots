@@ -1,60 +1,8 @@
-"use client";
-
-// 사용자 정의(에디터) 매듭 — localStorage 영속 + zustand 반응형 스토어.
+// 에디터 매듭 생성/동기화 헬퍼(영속은 repo + /api/knots 가 담당).
 // 에디터 매듭은 keyframe 방식: 각 스텝마다 줄 전체 포즈(poses[i])를 가지며, 애니메이션은
 // 포즈 사이를 보간한다(loose→tight 대신). path 는 마지막 포즈로 둔다(buildLoose 등 호환용).
 
-import { create } from "zustand";
 import type { Knot, Vec3 } from "./types";
-
-const KEY = "knots.custom.v1";
-
-function load(): Knot[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(KEY);
-    return raw ? (JSON.parse(raw) as Knot[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-function save(knots: Knot[]) {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(KEY, JSON.stringify(knots));
-  } catch {
-    /* 용량 초과 등 무시 */
-  }
-}
-
-interface CustomState {
-  knots: Knot[];
-  hydrate: () => void;
-  upsert: (k: Knot) => void;
-  remove: (id: string) => void;
-}
-
-export const useCustomKnots = create<CustomState>((set, get) => ({
-  knots: [],
-  hydrate: () => set({ knots: load() }),
-  upsert: (k) => {
-    const next = get().knots.filter((x) => x.id !== k.id);
-    next.push(k);
-    save(next);
-    set({ knots: next });
-  },
-  remove: (id) => {
-    const next = get().knots.filter((x) => x.id !== id);
-    save(next);
-    set({ knots: next });
-  },
-}));
-
-/** 비반응형 조회(getKnot/스토어 액션에서 사용). */
-export function getCustomKnot(id: string): Knot | undefined {
-  return useCustomKnots.getState().knots.find((k) => k.id === id);
-}
 
 // ── 새 매듭 생성 헬퍼 ──
 

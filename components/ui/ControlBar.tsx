@@ -4,7 +4,7 @@
 // 모든 동작은 PlayerCommands(스토어)로 전달된다. (키보드 어댑터와 동일한 버스)
 
 import { usePlayerStore } from "@/lib/player/store";
-import { getKnot } from "@/lib/knots/data";
+import { getKnot } from "@/lib/knots/registry";
 import { progressToStepIndex, stepIndexToProgress } from "@/lib/knots/interpolate";
 
 export default function ControlBar() {

@@ -5,17 +5,24 @@
 
 import { create } from "zustand";
 import type { Knot, Vec3 } from "@/lib/knots/types";
-import { useCustomKnots, newCustomKnot, syncCustomKnot } from "@/lib/knots/custom";
+import { newCustomKnot, syncCustomKnot } from "@/lib/knots/custom";
+import { useKnotsRepo } from "@/lib/knots/repo";
+
+// shape: 빌트인 매듭의 최종 모양(path) 한 개만 편집(reveal 애니메이션 유지).
+// keyframe: 커스텀 매듭의 스텝별 포즈 편집.
+type EditMode = "shape" | "keyframe";
 
 interface EditorState {
   editing: boolean;
   draft: Knot | null;
+  mode: EditMode;
   activeStep: number;
   selected: number | null; // 선택된 제어점 인덱스
 
   startNew: (name: string) => void;
   startEdit: (knot: Knot) => void;
   stop: () => void;
+  resetBuiltin: () => string | null; // 오버라이드 삭제 → 기본값 복원, 매듭 id 반환
   setActiveStep: (i: number) => void;
   select: (i: number | null) => void;
   movePoint: (i: number, pos: Vec3) => void;
@@ -36,20 +43,37 @@ function clone(k: Knot): Knot {
 export const useEditorStore = create<EditorState>((set, get) => ({
   editing: false,
   draft: null,
+  mode: "keyframe",
   activeStep: 0,
   selected: null,
 
   startNew: (name) => {
     const draft = newCustomKnot(name);
     const mid = Math.floor((draft.poses?.[0]?.length ?? 2) / 2);
-    set({ editing: true, draft, activeStep: 0, selected: mid });
+    set({ editing: true, draft, mode: "keyframe", activeStep: 0, selected: mid });
   },
   startEdit: (knot) => {
     const d = clone(knot);
-    const mid = Math.floor((d.poses?.[0]?.length ?? 2) / 2);
-    set({ editing: true, draft: d, activeStep: 0, selected: mid });
+    if (d.poses && d.poses.length) {
+      // 커스텀(멀티-포즈) 편집
+      const mid = Math.floor(d.poses[0].length / 2);
+      set({ editing: true, draft: d, mode: "keyframe", activeStep: 0, selected: mid });
+    } else {
+      // 빌트인: 최종 모양(path)만 편집. reveal 애니메이션은 유지.
+      d.poses = [d.path.map((p) => [...p] as Vec3)];
+      const mid = Math.floor(d.path.length / 2);
+      set({ editing: true, draft: d, mode: "shape", activeStep: 0, selected: mid });
+    }
   },
   stop: () => set({ editing: false, draft: null, selected: null }),
+
+  resetBuiltin: () => {
+    const d = get().draft;
+    if (!d) return null;
+    void useKnotsRepo.getState().remove(d.id); // 서버가 빌트인을 시드로 리셋
+    set({ editing: false, draft: null, selected: null });
+    return d.id;
+  },
 
   setActiveStep: (i) => {
     const d = get().draft;
@@ -125,8 +149,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   save: () => {
     const d = get().draft;
     if (!d) return null;
+    if (get().mode === "shape") {
+      // 빌트인 오버라이드: 편집한 path 만 반영, reveal 모델 유지(poses 제거).
+      const override: Knot = { ...d, path: d.poses?.[0] ?? d.path, poses: undefined };
+      void useKnotsRepo.getState().upsert(override);
+      set({ draft: override });
+      return override.id;
+    }
     const synced = syncCustomKnot(d);
-    useCustomKnots.getState().upsert(synced);
+    void useKnotsRepo.getState().upsert(synced);
     set({ draft: synced });
     return synced.id;
   },

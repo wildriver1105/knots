@@ -442,6 +442,32 @@ body {
   justify-content: center;
   color: var(--text-dim);
 }
+.knot-card__row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.knot-card__edited {
+  color: var(--accent-2);
+  font-size: 16px;
+  line-height: 1;
+}
+.knot-card__del {
+  background: rgba(224, 88, 75, 0.16);
+  color: #f08a80;
+  border-radius: 6px;
+  padding: 2px 7px;
+  font-size: 11px;
+  cursor: pointer;
+}
+.ed-shapehead {
+  font-size: 14px;
+  color: var(--text);
+  padding: 2px 0;
+}
+.ed-shapehead strong {
+  color: var(--accent-2);
+}
 
 /* ── 에디터 패널 ── */
 .editor-panel {

@@ -5,7 +5,7 @@
 
 import * as THREE from "three";
 import { useMemo } from "react";
-import { getKnot } from "@/lib/knots/data";
+import { getKnot } from "@/lib/knots/registry";
 import { usePlayerStore } from "@/lib/player/store";
 
 export default function DebugPoints() {

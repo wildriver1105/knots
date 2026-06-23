@@ -7,11 +7,11 @@ import { useMemo, useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { useInputAdapters } from "@/lib/player/useInputAdapters";
 import { createKeyboardAdapter } from "@/lib/player/adapters/keyboard";
-import { KNOTS } from "@/lib/knots/data";
+import { BUILTIN_SEED } from "@/lib/knots/data";
 import { validateAllKnots } from "@/lib/knots/validate";
 import { usePlayerStore } from "@/lib/player/store";
-import { getKnot } from "@/lib/knots/data";
-import { useCustomKnots } from "@/lib/knots/custom";
+import { getKnot } from "@/lib/knots/registry";
+import { useKnotsRepo } from "@/lib/knots/repo";
 import { useEditorStore } from "@/lib/editor/store";
 import KnotPicker from "@/components/ui/KnotPicker";
 import StepPanel from "@/components/ui/StepPanel";
@@ -33,13 +33,15 @@ export default function KnotApp() {
   const adapters = useMemo(() => [createKeyboardAdapter()], []);
   useInputAdapters(adapters);
 
-  const hydrate = useCustomKnots((s) => s.hydrate);
+  const hydrate = useKnotsRepo((s) => s.hydrate);
   useEffect(() => {
-    validateAllKnots(KNOTS);
-    hydrate(); // localStorage 의 커스텀 매듭 로드
+    validateAllKnots(BUILTIN_SEED);
+    hydrate(); // 파일(/api/knots)에서 전체 매듭 로드
   }, [hydrate]);
 
   const knotId = usePlayerStore((s) => s.knotId);
+  // repo 가 하이드레이트되면 리렌더되도록 구독(getKnot 은 repo 를 읽음).
+  useKnotsRepo((s) => s.loaded);
   const knot = getKnot(knotId);
   const editing = useEditorStore((s) => s.editing);
 

@@ -3,7 +3,7 @@
 // 로프가 감싸는 대상: 말뚝(pole) 또는 혼 클리트(cleat).
 // 클리트는 primitive 조합으로 구성(베이스 바 + 두 뿔). 추후 GLTF 로 교체 가능.
 
-import { getKnot } from "@/lib/knots/data";
+import { getKnot } from "@/lib/knots/registry";
 import { usePlayerStore } from "@/lib/player/store";
 import type { Vec3 } from "@/lib/knots/types";
 
