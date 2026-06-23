@@ -77,12 +77,17 @@ function arcLengths(points: Vec3[]): { cum: number[]; total: number } {
  * path 와 같은 점 개수·같은 호 길이 간격으로, layCenter 를 중심으로 layDir 방향의 직선에 배치.
  * (점 i 가 final path 에서와 동일한 호 거리에 놓이므로 morph 시 점이 뭉치지 않는다.)
  */
-export function buildStraightBaseline(path: Vec3[], layDir: Vec3 = [1, 0, 0], layCenter?: Vec3): Vec3[] {
+export function buildStraightBaseline(
+  path: Vec3[],
+  layDir: Vec3 = [1, 0, 0],
+  layCenter?: Vec3,
+  lengthScale = 1
+): Vec3[] {
   const { cum, total } = arcLengths(path);
   const center = layCenter ?? centroid(path);
   const dir = normalize(layDir);
   return path.map((_, i) => {
-    const d = cum[i] - total / 2;
+    const d = (cum[i] - total / 2) * lengthScale;
     return [center[0] + dir[0] * d, center[1] + dir[1] * d, center[2] + dir[2] * d] as Vec3;
   });
 }
