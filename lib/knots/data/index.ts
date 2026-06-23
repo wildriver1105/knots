@@ -1,4 +1,5 @@
 import type { Knot, KnotId } from "../types";
+import { getCustomKnot } from "../custom";
 import { figureEight } from "./figureEight";
 import { cloveHitch } from "./cloveHitch";
 import { cleatHitch } from "./cleatHitch";
@@ -16,13 +17,13 @@ export const KNOTS: Knot[] = [
   bowline,
 ];
 
-const BY_ID: Record<KnotId, Knot> = KNOTS.reduce((acc, k) => {
+const BY_ID: Record<string, Knot> = KNOTS.reduce((acc, k) => {
   acc[k.id] = k;
   return acc;
-}, {} as Record<KnotId, Knot>);
+}, {} as Record<string, Knot>);
 
-export function getKnot(id: KnotId): Knot {
-  return BY_ID[id] ?? figureEight;
+export function getKnot(id: string): Knot {
+  return BY_ID[id as KnotId] ?? getCustomKnot(id) ?? figureEight;
 }
 
 export const DEFAULT_KNOT_ID: KnotId = "figure-eight";

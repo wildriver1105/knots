@@ -8,6 +8,7 @@ import { OrbitControls } from "@react-three/drei";
 export default function CameraRig() {
   return (
     <OrbitControls
+      makeDefault
       enablePan={false}
       minDistance={2.5}
       maxDistance={9}

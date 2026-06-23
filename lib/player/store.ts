@@ -5,14 +5,13 @@
 // 스토어에는 입력 로직도, three/DOM 의존도 없다 → 테스트·재사용이 쉽다.
 
 import { create } from "zustand";
-import type { KnotId } from "@/lib/knots/types";
 import { getKnot, DEFAULT_KNOT_ID } from "@/lib/knots/data";
 import { progressToStepIndex, stepIndexToProgress } from "@/lib/knots/interpolate";
 
 export type PlayMode = "step" | "continuous";
 
 export interface PlayerState {
-  knotId: KnotId;
+  knotId: string; // 빌트인 KnotId 또는 커스텀 매듭 id
   mode: PlayMode;
 
   // step 모드
@@ -24,7 +23,7 @@ export interface PlayerState {
   playbackRate: number;
 
   // ── 커맨드 API (입력원 공통) ──
-  loadKnot: (id: KnotId) => void;
+  loadKnot: (id: string) => void;
   setMode: (m: PlayMode) => void;
   play: () => void;
   pause: () => void;

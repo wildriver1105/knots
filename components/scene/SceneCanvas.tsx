@@ -13,8 +13,11 @@ import KnotObject from "./KnotObject";
 import CameraRig from "./CameraRig";
 import PlaybackTicker from "./PlaybackTicker";
 import DebugPoints from "./DebugPoints";
+import EditScene from "./EditScene";
+import { useEditorStore } from "@/lib/editor/store";
 
 export default function SceneCanvas({ showDebug = false }: { showDebug?: boolean }) {
+  const editing = useEditorStore((s) => s.editing);
   return (
     <Canvas
       shadows
@@ -25,13 +28,19 @@ export default function SceneCanvas({ showDebug = false }: { showDebug?: boolean
       <Suspense fallback={null}>
         <Lighting />
         <group position={[0, 0, 0]}>
-          <KnotObject />
-          <Rope />
-          {showDebug && <DebugPoints />}
+          {editing ? (
+            <EditScene />
+          ) : (
+            <>
+              <KnotObject />
+              <Rope />
+              {showDebug && <DebugPoints />}
+            </>
+          )}
         </group>
         <Ground />
       </Suspense>
-      <PlaybackTicker />
+      {!editing && <PlaybackTicker />}
       <CameraRig />
     </Canvas>
   );

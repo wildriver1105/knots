@@ -154,7 +154,7 @@ export function knotShape(loose: Vec3[], tight: Vec3[], formProgress: number, re
   for (let i = 0; i < N; i++) {
     const rank = reverse ? (N - 1 - i) / (N - 1) : i / (N - 1);
     const local = Math.min(1, Math.max(0, (pEff - rank) / FORM_BLEND));
-    const e = easeOutBack(local, 0.9);
+    const e = easeOutBack(local, 1.15); // 살짝 넘쳤다 돌아오는 "탁" 조임
     out[i] = lerpVec3(loose[i], tight[i], e);
   }
   return out;
@@ -163,6 +163,26 @@ export function knotShape(loose: Vec3[], tight: Vec3[], formProgress: number, re
 /** 하위호환: straight → path 단순 staged. */
 export function formCenterline(path: Vec3[], straight: Vec3[], formProgress: number, reverse = false): Vec3[] {
   return formStaged(straight, path, formProgress, reverse);
+}
+
+/**
+ * 에디터(keyframe) 매듭: 포즈 사이를 form(0..1)으로 보간.
+ * 스텝 K개를 균등 구간으로 나눠 인접 포즈를 easeInOut 으로 섞는다.
+ */
+export function interpolatePoses(poses: Vec3[][], form: number): Vec3[] {
+  const K = poses.length;
+  if (K === 0) return [];
+  if (K === 1) return poses[0].map((p) => [p[0], p[1], p[2]] as Vec3);
+  const t = Math.min(1, Math.max(0, form)) * (K - 1);
+  let i = Math.floor(t);
+  if (i >= K - 1) i = K - 2;
+  const f = easeInOut(t - i);
+  const a = poses[i];
+  const b = poses[i + 1];
+  const n = Math.min(a.length, b.length);
+  const out: Vec3[] = new Array(n);
+  for (let j = 0; j < n; j++) out[j] = lerpVec3(a[j], b[j], f);
+  return out;
 }
 
 /** 연속 progress(0..1) 에서 가장 가까운 step 인덱스(UI 표시용). */

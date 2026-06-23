@@ -12,12 +12,13 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import type { Vec3 } from "@/lib/knots/types";
 import { getKnot } from "@/lib/knots/data";
-import { buildLoose, knotShape, sliceCurve } from "@/lib/knots/interpolate";
+import { buildLoose, knotShape, sliceCurve, interpolatePoses } from "@/lib/knots/interpolate";
 import { RopeSolver, type SolverOpts } from "@/lib/knots/physics";
 import { usePlayerStore } from "@/lib/player/store";
 import { getRopeTextures } from "./ropeTexture";
 
-const SOLVER: SolverOpts = { gravity: 2.6, damping: 0.9, spring: 0.32, iterations: 4, collisionIterations: 2 };
+// 중력 제외. 텐션(비신축)·자기충돌·목표 스프링으로 "당기면 조여지는" 모션.
+const SOLVER: SolverOpts = { gravity: 0, damping: 0.86, spring: 0.3, iterations: 6, collisionIterations: 3 };
 
 function buildTube(points: Vec3[], radius: number): THREE.TubeGeometry | null {
   if (points.length < 2) return null;
@@ -139,11 +140,14 @@ export default function Rope() {
     formRef.current = Math.abs(d) > 0.0008 ? cur + d * (1 - Math.exp(-7 * Math.min(dt, 0.05))) : target;
     const form = formRef.current;
 
-    const targets = strands.map((s) => knotShape(s.loose, s.path, form, knot.formReverse));
+    // 커스텀(에디터) 매듭은 포즈 보간, 빌트인은 loose→tight.
+    const targets = knot.poses
+      ? [interpolatePoses(knot.poses, form)]
+      : strands.map((s) => knotShape(s.loose, s.path, form, knot.formReverse));
     const result = solver.step(targets, dt, SOLVER);
 
-    // 손 순서대로 점점 드러남: 시작엔 standing 끝만, 진행할수록 working end 가 꿰어지며 조여진다.
-    const reveal = Math.min(1, 0.1 + form * 0.96);
+    // 빌트인: 손 순서대로 점점 드러남. 커스텀: 줄 전체가 포즈 사이를 움직임(reveal 1).
+    const reveal = knot.poses ? 1 : Math.min(1, 0.1 + form * 0.96);
 
     const mainPts = sliceCurve(result[0], reveal);
     if (hasB) {

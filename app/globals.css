@@ -381,6 +381,188 @@ body {
   opacity: 0.7;
 }
 
+/* ── 헤더 도구 / 음성 ── */
+.header-tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.voice-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--stroke);
+  background: var(--panel);
+  color: var(--text-dim);
+  padding: 8px 12px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  max-width: 220px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.voice-btn--on {
+  color: #fff;
+  border-color: #e0584b;
+  background: linear-gradient(180deg, rgba(224, 88, 75, 0.22), var(--panel));
+}
+.voice-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #6b7787;
+}
+.voice-btn--on .voice-dot {
+  background: #ff5a4a;
+  box-shadow: 0 0 0 0 rgba(255, 90, 74, 0.6);
+  animation: voicePulse 1.4s infinite;
+}
+@keyframes voicePulse {
+  0% { box-shadow: 0 0 0 0 rgba(255, 90, 74, 0.5); }
+  70% { box-shadow: 0 0 0 7px rgba(255, 90, 74, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 90, 74, 0); }
+}
+
+/* ── 매듭 카드(커스텀/새로) ── */
+.knot-card--custom {
+  border-color: rgba(168, 85, 247, 0.35);
+}
+.knot-card__edit {
+  background: rgba(168, 85, 247, 0.18);
+  color: #c79cf5;
+  cursor: pointer;
+}
+.knot-card--new {
+  border-style: dashed;
+  border-color: var(--stroke-strong);
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
+}
+
+/* ── 에디터 패널 ── */
+.editor-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--panel);
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius);
+  padding: 14px;
+  box-shadow: var(--shadow);
+}
+.editor-panel input,
+.editor-panel textarea {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--stroke);
+  border-radius: 9px;
+  color: var(--text);
+  padding: 8px 10px;
+  font-size: 13px;
+  font-family: inherit;
+}
+.editor-panel textarea {
+  resize: vertical;
+}
+.ed-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.ed-name {
+  flex: 1;
+  font-weight: 700;
+  font-size: 15px !important;
+}
+.ed-colors {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.ed-colors label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.ed-colors input[type="color"] {
+  width: 30px;
+  height: 26px;
+  padding: 0;
+  border-radius: 6px;
+}
+.ed-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ed-step {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--stroke);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font-weight: 700;
+  cursor: pointer;
+}
+.ed-step--on {
+  background: var(--accent);
+  color: #06121d;
+  border-color: transparent;
+}
+.ed-step--add {
+  border-style: dashed;
+  color: var(--text-dim);
+}
+.ed-mini {
+  border: 1px solid var(--stroke);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-dim);
+  padding: 6px 9px;
+  border-radius: 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.ed-mini:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.ed-actions {
+  flex-wrap: wrap;
+}
+.ed-hint {
+  margin: 2px 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+.ed-save {
+  justify-content: flex-end;
+  margin-top: 2px;
+}
+.ed-cancel {
+  border: 1px solid var(--stroke);
+  background: transparent;
+  color: var(--text-dim);
+  padding: 9px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.ed-save-btn {
+  border: 0;
+  background: var(--accent);
+  color: #06121d;
+  font-weight: 700;
+  padding: 9px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
 /* ── 반응형(태블릿/좁은 화면) ── */
 @media (max-width: 900px) {
   .main {

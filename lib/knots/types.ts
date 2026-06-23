@@ -42,7 +42,7 @@ export interface Step {
 }
 
 export interface Knot {
-  id: KnotId;
+  id: KnotId | string; // 빌트인 KnotId 또는 커스텀 매듭 id
   name: string;
   blurb: string;
   difficulty: 1 | 2 | 3;
@@ -73,4 +73,12 @@ export interface Knot {
   defaultStepDuration: number;
   /** 순서 있는 step 목록. reveal 은 단조 증가, 마지막은 1. */
   steps: Step[];
+
+  /**
+   * 에디터로 만든 매듭(keyframe 방식). 각 원소 = 한 스텝의 줄 전체 포즈(길이 = path.length).
+   * 있으면 애니메이션이 포즈 사이를 보간한다(loose→tight 대신). steps 와 1:1.
+   */
+  poses?: Vec3[][];
+  /** 사용자 정의(에디터) 매듭 여부. */
+  isCustom?: boolean;
 }
