@@ -55,9 +55,17 @@ export interface Knot {
   colorSplitIndex?: number;
   /**
    * 추가 가닥(bend 매듭용). square knot 처럼 두 로프를 잇는 매듭은 별도 strand 가 필요하다.
-   * reveal 은 main path 와 동일 비율로 동시에 그려진다.
+   * main path 와 동일 진행도로 함께 형성된다. layDir 로 곧은 줄의 놓임 방향을 따로 줄 수 있다.
    */
-  extraStrands?: { path: Vec3[]; color: string }[];
+  extraStrands?: { path: Vec3[]; color: string; layDir?: Vec3; layCenter?: Vec3 }[];
+
+  // ── morph(형성) 튜닝 ──
+  /** 곧게 펴진 줄(straight baseline)의 놓임 방향. 기본 [1,0,0](수평). */
+  layDir?: Vec3;
+  /** 곧은 줄의 중심 위치. 기본 path 무게중심. 말뚝 앞에 놓으려면 z 를 키운다. */
+  layCenter?: Vec3;
+  /** 형성 시작 끝. true 면 path 의 마지막 점(standing part)부터 형성한다. */
+  formReverse?: boolean;
   /** 로프 튜브 반경(씬 단위, 보통 ~0.06). */
   ropeRadius: number;
   object: KnotObjectDef;
