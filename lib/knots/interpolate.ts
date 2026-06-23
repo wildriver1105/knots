@@ -90,29 +90,79 @@ export function buildStraightBaseline(path: Vec3[], layDir: Vec3 = [1, 0, 0], la
 const FORM_BLEND = 0.3; // anchor 에서 끝까지 형성이 번지는 전이 폭(0..1)
 
 /**
- * formProgress(0..1) 에 따라 straight → path 로 점별 morph.
- * anchor(reverse=false 면 index 0, true 면 마지막 index) 쪽 점부터 자리를 잡고,
- * 아직 형성 안 된 점은 straight 위치에 머문다.
- * formProgress=0 → 완전히 곧은 줄, =1 → 완성된 매듭.
+ * progress 에 따라 from → to 로 점별 staged morph.
+ * anchor(reverse=false 면 index 0) 쪽 점부터 자리를 잡고, 나머지는 from 위치에 머문다.
  */
-export function formCenterline(
-  path: Vec3[],
-  straight: Vec3[],
-  formProgress: number,
-  reverse = false
-): Vec3[] {
-  const N = path.length;
-  if (N < 2) return path.slice();
-  const p = Math.min(1, Math.max(0, formProgress));
-  // p=1 일 때 끝 점까지 완전히 형성되도록 유효 진행도를 BLEND 만큼 늘린다.
+export function formStaged(from: Vec3[], to: Vec3[], progress: number, reverse = false): Vec3[] {
+  const N = to.length;
+  if (N < 2) return to.slice();
+  const p = Math.min(1, Math.max(0, progress));
   const pEff = p * (1 + FORM_BLEND);
   const out: Vec3[] = new Array(N);
   for (let i = 0; i < N; i++) {
-    const rank = reverse ? (N - 1 - i) / (N - 1) : i / (N - 1); // 형성 순서(0=먼저)
+    const rank = reverse ? (N - 1 - i) / (N - 1) : i / (N - 1);
     const w = easeInOut(Math.min(1, Math.max(0, (pEff - rank) / FORM_BLEND)));
-    out[i] = lerpVec3(straight[i], path[i], w);
+    out[i] = lerpVec3(from[i], to[i], w);
   }
   return out;
+}
+
+/** 살짝 넘쳤다가 제자리로 돌아오는 ease(잡아당겨 조이는 "탁" 느낌). */
+export function easeOutBack(t: number, overshoot = 1.5): number {
+  const c = Math.min(1, Math.max(0, t));
+  const c1 = overshoot;
+  const c3 = c1 + 1;
+  return 1 + c3 * Math.pow(c - 1, 3) + c1 * Math.pow(c - 1, 2);
+}
+
+/**
+ * 느슨한 매듭(loose) 생성 — path 를 무게중심 기준으로 부풀린다(고리는 크게, 끝은 더 늘어지게).
+ * 시작 화면에 "느슨하지만 알아볼 수 있는 매듭"이 보이고, 여기서 손 순서대로 조여 완성형이 된다.
+ */
+export function buildLoose(path: Vec3[], inflate = 1.55, tailExtra = 1.25): Vec3[] {
+  const c: Vec3 = [0, 0, 0];
+  for (const p of path) {
+    c[0] += p[0];
+    c[1] += p[1];
+    c[2] += p[2];
+  }
+  const n = path.length || 1;
+  c[0] /= n;
+  c[1] /= n;
+  c[2] /= n;
+  const N = path.length;
+  return path.map((p, i) => {
+    const u = N > 1 ? i / (N - 1) : 0;
+    const nearEnd = Math.min(u, 1 - u); // 0 = 끝
+    const s = inflate + (1 - Math.min(1, nearEnd / 0.25)) * (tailExtra - 1) * inflate;
+    return [c[0] + (p[0] - c[0]) * s, c[1] + (p[1] - c[1]) * s, c[2] + (p[2] - c[2]) * s] as Vec3;
+  });
+}
+
+/**
+ * 형성 진행도(0..1) → 화면에 그릴 제어점.
+ * loose(느슨한 매듭) → tight(path)로 손 순서대로(staged) 조인다.
+ * anchor(standing part) 쪽부터 자리를 잡고 working end 가 마지막에 들어온다.
+ * 각 점은 easeOutBack 으로 살짝 넘쳤다 돌아오며 "탁" 조이는 느낌.
+ */
+export function knotShape(loose: Vec3[], tight: Vec3[], formProgress: number, reverse = false): Vec3[] {
+  const N = tight.length;
+  if (N < 2) return tight.slice();
+  const p = Math.min(1, Math.max(0, formProgress));
+  const pEff = p * (1 + FORM_BLEND);
+  const out: Vec3[] = new Array(N);
+  for (let i = 0; i < N; i++) {
+    const rank = reverse ? (N - 1 - i) / (N - 1) : i / (N - 1);
+    const local = Math.min(1, Math.max(0, (pEff - rank) / FORM_BLEND));
+    const e = easeOutBack(local, 0.9);
+    out[i] = lerpVec3(loose[i], tight[i], e);
+  }
+  return out;
+}
+
+/** 하위호환: straight → path 단순 staged. */
+export function formCenterline(path: Vec3[], straight: Vec3[], formProgress: number, reverse = false): Vec3[] {
+  return formStaged(straight, path, formProgress, reverse);
 }
 
 /** 연속 progress(0..1) 에서 가장 가까운 step 인덱스(UI 표시용). */

@@ -1,36 +1,39 @@
 // Bowline — 끝에 풀리지 않는 고정 고리(fixed loop)를 만드는 세일링 핵심 매듭.
-// "토끼가 구멍에서 나와 나무를 돌아 다시 구멍으로." standing part(노랑) + working end(빨강).
-//
-// 구성: 위로 뻗는 standing part → 아래로 큰 고정 고리 → working end 가 작은 구멍을 통해
-// 나와 standing part 를 돌아 다시 구멍으로 내려간다.
+// "토끼가 구멍에서 나와 나무를 돌아 다시 구멍으로." standing part(노랑) 가 작은 고리(구멍)를
+// 만들고, working end(빨강) 가 구멍으로 올라와 standing 을 돌아 다시 구멍으로 내려간다.
+// 아래에는 큰 고정 고리가 남는다.
 
 import type { Knot, Vec3 } from "../types";
-import { arc, line, join } from "../builder";
 
-const D = (deg: number) => (deg * Math.PI) / 180;
-
-const LC: Vec3 = [-0.05, -0.6, 0]; // 큰 고리 중심
-const LR = 0.92; // 큰 고리 반경
-
-// standing part: 위 → 큰 고리 시작점
-const standing = line([0.5, 1.75, 0], [LC[0] + Math.cos(D(80)) * LR, LC[1] + Math.sin(D(80)) * LR, 0], 12);
-
-// 큰 고정 고리: 80° → -260° (위쪽에 구멍(hole) 간격을 남김)
-const bigLoop = arc(LC, LR, D(80), D(-260), 64, "xy");
-
-// 여기서부터 working end. 구멍을 통해 앞으로 나옴 → 나무(standing)를 돌아 → 구멍으로 내려감.
-const splitAt = standing.length + bigLoop.length;
-
-const work = join(
-  line(bigLoop[bigLoop.length - 1], [-0.05, 0.46, 0.22], 5), // 구멍 통과(뒤→앞)
-  line([-0.05, 0.46, 0.22], [0.32, 0.62, 0.2], 5), // standing 위로(over)
-  line([0.32, 0.62, 0.2], [0.5, 0.42, -0.2], 5), // standing 뒤로(behind)
-  line([0.5, 0.42, -0.2], [0.28, 0.22, -0.2], 4), // 뒤에서 아래로
-  line([0.28, 0.22, -0.2], [0.0, 0.36, 0.22], 5), // 다시 구멍으로(앞)
-  line([0.0, 0.36, 0.22], [-0.2, 0.02, 0.45], 7) // working end 꼬리
-);
-
-const path: Vec3[] = join(standing, bigLoop, work);
+const path: Vec3[] = [
+  // standing part: 위에서 내려와 매듭으로
+  [0.62, 1.6, 0.0],
+  [0.52, 0.7, 0.0],
+  [0.42, 0.32, 0.0],
+  // 작은 고리(구멍): standing 이 자기 위로 교차해 고리를 만든다
+  [0.12, 0.34, 0.0],
+  [-0.04, 0.06, 0.0],
+  [0.2, -0.12, 0.17], // 교차 OVER
+  [0.46, 0.0, 0.17],
+  [0.5, 0.3, 0.14], // 구멍 닫힘(중심 ~0.25,0.12)
+  // 큰 고정 고리: 아래로 한 바퀴
+  [0.32, -0.24, 0.0],
+  [-0.3, -0.5, 0.0],
+  [-0.8, -1.05, 0.0],
+  [-0.34, -1.46, 0.0],
+  [0.36, -1.3, 0.0],
+  [0.62, -0.58, 0.0],
+  [0.5, -0.14, 0.0], // 구멍 근처로 복귀
+  // working end: 구멍으로 올라와 → standing 뒤로 돌아 → 구멍으로 내려감
+  [0.42, 0.12, 0.2], // 구멍 통과(앞)
+  [0.5, 0.44, 0.2], // 앞으로 올라감
+  [0.64, 0.56, -0.04], // standing 위를 넘음
+  [0.68, 0.34, -0.2], // 뒤로
+  [0.5, 0.12, -0.2], // 뒤에서 내려옴
+  [0.32, 0.2, 0.2], // 다시 구멍 통과(앞)
+  [0.18, -0.06, 0.36], // working end 꼬리
+  [0.02, -0.26, 0.42],
+];
 
 export const bowline: Knot = {
   id: "bowline",
@@ -40,14 +43,15 @@ export const bowline: Knot = {
   path,
   ropeColor: "#f3c14a", // standing part
   ropeColorB: "#e0584b", // working end
-  colorSplitIndex: splitAt,
+  colorSplitIndex: 15,
   ropeRadius: 0.07,
   object: { kind: "none" },
+  formReverse: false,
   defaultStepDuration: 1.5,
   steps: [
-    { id: "loop", title: "Make the hole", instruction: "standing part 에 작은 고리(구멍)를 만든다 — 토끼 굴.", reveal: 0.5 },
-    { id: "up", title: "Up through the hole", instruction: "working end 를 아래에서 구멍 위로 통과시킨다 — 토끼가 나온다.", reveal: 0.66 },
-    { id: "around", title: "Around the tree", instruction: "끝을 standing part 뒤로 돌린다 — 나무를 돈다.", reveal: 0.85 },
+    { id: "loop", title: "Make the hole", instruction: "standing part 에 작은 고리(구멍)를 만든다 — 토끼 굴.", reveal: 0.42 },
+    { id: "up", title: "Up through the hole", instruction: "working end 를 구멍 위로 통과시킨다 — 토끼가 나온다.", reveal: 0.62 },
+    { id: "around", title: "Around the tree", instruction: "끝을 standing part 뒤로 돌린다 — 나무를 돈다.", reveal: 0.82 },
     { id: "down", title: "Back down the hole", instruction: "끝을 다시 구멍으로 내리고 당겨 조인다 — 굴로 돌아간다.", reveal: 1 },
   ],
 };

@@ -1,33 +1,40 @@
-// Figure-eight (stopper) knot.
-// 수학적 figure-eight 매듭(4_1)의 표준 파라메트릭을 살짝 열어(gap) 두 가닥 끝을 만든다.
-// 위상이 정확하고 over/under(z=sin4t)가 자연스러워 학습용으로 깔끔하다.
+// Figure-eight (Flemish) stopper knot.
+// 손으로 직접 배치한 제어점 — standing part 가 내려오며 고리를 만들고, working end 가
+// standing 뒤로 돌아 한 바퀴 비튼 뒤 고리로 다시 내려가 뽑힌다(8자 멈춤 매듭).
+// z 는 교차점 over/under 분리(로프 반경 0.07 의 2배 이상).
 
 import type { Knot, Vec3 } from "../types";
-import { sampleParametric, line, join } from "../builder";
 
-const SCALE_XY = 0.46;
-const SCALE_Z = 0.22; // z 깊이 — 로프 반경(0.07)의 ~3배 이상이라 교차가 또렷하다.
+const Z = 0.18;
 
-function f(t: number): Vec3 {
-  const r = 2 + Math.cos(2 * t);
-  return [r * Math.cos(3 * t) * SCALE_XY, r * Math.sin(3 * t) * SCALE_XY, Math.sin(4 * t) * SCALE_Z];
-}
-
-const GAP = 0.34;
-const core = sampleParametric(f, GAP, 2 * Math.PI - GAP, 96);
-
-// 양 끝에 직선 꼬리를 덧대 "로프 끝"처럼 보이게 한다(끝점 접선 방향 외삽).
-function extend(a: Vec3, b: Vec3, len: number, n: number): Vec3[] {
-  const d: Vec3 = [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-  const m = Math.hypot(d[0], d[1], d[2]) || 1;
-  const end: Vec3 = [a[0] + (d[0] / m) * len, a[1] + (d[1] / m) * len, a[2] + (d[2] / m) * len];
-  return line(end, a, n); // 끝 → 코어 시작 방향
-}
-
-const headTail = extend(core[0], core[1], 0.55, 10); // 시작 꼬리(끝 → core[0])
-const footTail = extend(core[core.length - 1], core[core.length - 2], 0.55, 10).reverse(); // core 끝 → 꼬리
-
-const path = join(headTail, core, footTail);
+// standing(노랑, 위) → working end(빨강, 아래로 뽑힘). 교차마다 z 부호 교대.
+const path: Vec3[] = [
+  // standing part 가 위에서 내려옴
+  [0.08, 1.4, 0.0],
+  [0.0, 0.8, 0.0],
+  [-0.06, 0.36, 0.02],
+  // 아래 고리: 왼쪽으로 교차(OVER) → 아래로 한 바퀴 → 오른쪽으로 올라옴(UNDER)
+  [-0.5, 0.18, Z],
+  [-0.74, -0.28, 0.06],
+  [-0.5, -0.72, 0.0],
+  [0.0, -0.86, 0.0],
+  [0.5, -0.72, 0.0],
+  [0.74, -0.28, -0.06],
+  [0.5, 0.18, -Z],
+  [0.12, 0.4, -Z],
+  // 위쪽으로 한 바퀴 비틀어 올라감(working end 가 standing 을 감음)
+  [-0.26, 0.56, 0.0],
+  [-0.46, 0.98, Z],
+  [-0.08, 1.18, Z],
+  [0.32, 1.02, 0.0],
+  [0.42, 0.6, -Z],
+  // 고리 안으로 다시 통과해 아래로 뽑힘
+  [0.16, 0.3, Z],
+  [0.12, -0.04, Z],
+  [0.34, -0.34, 0.02],
+  [0.62, -0.22, 0.0],
+  [0.92, -0.05, 0.0],
+];
 
 export const figureEight: Knot = {
   id: "figure-eight",
@@ -36,42 +43,17 @@ export const figureEight: Knot = {
     "기본 멈춤 매듭(stopper). 로프가 블록·페어리드를 빠져나가지 않게 끝에 묶는다. 풀기 쉽고 절대 엉키지 않는다.",
   difficulty: 1,
   path,
-  ropeColor: "#e0584b", // working end (빨강)
-  ropeColorB: "#f3c14a", // standing part (노랑)
-  colorSplitIndex: Math.floor(path.length * 0.52),
+  ropeColor: "#f3c14a", // standing part (위, 노랑)
+  ropeColorB: "#e0584b", // working end (빨강)
+  colorSplitIndex: 10,
   ropeRadius: 0.07,
   object: { kind: "none" },
+  formReverse: false, // index 0(standing 위)부터 형성
   defaultStepDuration: 1.4,
   steps: [
-    {
-      id: "start",
-      title: "Standing part",
-      instruction: "한 손으로 standing part(고정된 줄)를 잡고 working end(작업 끝)를 여유 있게 둔다.",
-      reveal: 0.14,
-    },
-    {
-      id: "cross",
-      title: "Cross over",
-      instruction: "working end 를 standing part 위로 교차시켜 첫 고리를 만든다.",
-      reveal: 0.4,
-    },
-    {
-      id: "around",
-      title: "Around behind",
-      instruction: "끝을 standing part 뒤로 돌려 8자 모양의 두 번째 굽이를 만든다.",
-      reveal: 0.66,
-    },
-    {
-      id: "through",
-      title: "Through the loop",
-      instruction: "working end 를 처음 만든 고리 안으로 통과시켜 내린다.",
-      reveal: 0.88,
-    },
-    {
-      id: "dress",
-      title: "Dress & tighten",
-      instruction: "양쪽 끝을 당겨 매듭을 정돈하고 조인다. 깔끔한 8자 멈춤 매듭 완성.",
-      reveal: 1,
-    },
+    { id: "loop", title: "Make a loop", instruction: "standing part 로 고리를 만든다.", reveal: 0.35 },
+    { id: "around", title: "Around behind", instruction: "working end 를 standing part 뒤로 돌린다.", reveal: 0.6 },
+    { id: "through", title: "Through the loop", instruction: "끝을 고리 안으로 통과시켜 내린다.", reveal: 0.82 },
+    { id: "dress", title: "Dress & tighten", instruction: "양쪽 끝을 당겨 8자 모양으로 정돈해 조인다.", reveal: 1 },
   ],
 };
