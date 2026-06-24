@@ -6,6 +6,7 @@
 //  (3) 같은 가닥 내 이웃 거리(로프 비신축)를 유지하고,
 //  (4) 모든 점끼리 2*radius 보다 가까우면 서로 밀어낸다(자기충돌 → 가닥이 통과하지 않음).
 
+import * as THREE from "three";
 import type { Vec3 } from "./types";
 
 export interface SolverOpts {
@@ -21,43 +22,80 @@ interface StrandRange {
   count: number;
 }
 
+const dist3 = (a: Vec3, b: Vec3) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+const lerp3 = (a: Vec3, b: Vec3, t: number): Vec3 => [
+  a[0] + (b[0] - a[0]) * t,
+  a[1] + (b[1] - a[1]) * t,
+  a[2] + (b[2] - a[2]) * t,
+];
+
+/**
+ * 매끄러운 CatmullRom(centripetal) 곡선을 따라 호 길이 균일 간격 count개 점으로 리샘플.
+ * (직선 보간이면 제어 다각형을 따라가 각져 보임 → 렌더와 동일한 곡선에서 샘플해야 매끈하다.)
+ */
+function resampleUniform(points: Vec3[], count: number): Vec3[] {
+  const n = points.length;
+  if (n === 0) return [];
+  if (n === 1 || count <= 1) return Array.from({ length: Math.max(1, count) }, () => [...points[0]] as Vec3);
+  const curve = new THREE.CatmullRomCurve3(
+    points.map((p) => new THREE.Vector3(p[0], p[1], p[2])),
+    false,
+    "centripetal"
+  );
+  const spaced = curve.getSpacedPoints(count - 1); // count 개 반환
+  return spaced.map((v) => [v.x, v.y, v.z] as Vec3);
+}
+
+function arcLength(points: Vec3[]): number {
+  let s = 0;
+  for (let i = 1; i < points.length; i++) s += dist3(points[i], points[i - 1]);
+  return s;
+}
+
+// 솔버는 "성긴 제어점"이 아니라 균일하게 촘촘히 리샘플한 점에서 시뮬레이션한다.
+// → 자기충돌이 튜브 관통을 실제로 막고, 장력이 연속 줄처럼 전파된다.
 export class RopeSolver {
   pos: Vec3[] = [];
   prev: Vec3[] = [];
-  endWeight: number[] = [];
   strands: StrandRange[] = [];
   radius: number;
+  private denseCounts: number[] = [];
   private signature = "";
 
   constructor(radius: number) {
     this.radius = radius;
   }
 
+  /** 가닥별 촘촘한 점 개수 = 호 길이 / (반경*1.5), 10..140 사이. */
+  private denseCountFor(points: Vec3[]): number {
+    const spacing = this.radius * 1.5;
+    return Math.max(10, Math.min(140, Math.round(arcLength(points) / spacing)));
+  }
+
   private sigOf(targets: Vec3[][]): string {
     return targets.map((t) => t.length).join(",");
   }
 
-  /** 가닥 구성이 바뀌면 목표로 초기화. */
+  /** 입력 가닥 구성(점 개수)이 바뀌면 dense 카운트 재계산 후 초기화. */
   private ensure(targets: Vec3[][]) {
     const sig = this.sigOf(targets);
     if (sig === this.signature) return;
     this.signature = sig;
     this.pos = [];
     this.prev = [];
-    this.endWeight = [];
     this.strands = [];
+    this.denseCounts = targets.map((t) => this.denseCountFor(t));
     let idx = 0;
-    for (const t of targets) {
-      this.strands.push({ start: idx, count: t.length });
-      for (let i = 0; i < t.length; i++) {
-        this.pos.push([t[i][0], t[i][1], t[i][2]]);
-        this.prev.push([t[i][0], t[i][1], t[i][2]]);
-        const u = t.length > 1 ? i / (t.length - 1) : 0;
-        const nearEnd = Math.min(u, 1 - u);
-        this.endWeight.push(Math.max(0, 1 - nearEnd / 0.22));
+    targets.forEach((t, si) => {
+      const dc = this.denseCounts[si];
+      const dense = resampleUniform(t, dc);
+      this.strands.push({ start: idx, count: dc });
+      for (const p of dense) {
+        this.pos.push([p[0], p[1], p[2]]);
+        this.prev.push([p[0], p[1], p[2]]);
       }
-      idx += t.length;
-    }
+      idx += dc;
+    });
   }
 
   snap(targets: Vec3[][]) {
@@ -67,14 +105,16 @@ export class RopeSolver {
 
   step(targets: Vec3[][], dt: number, opts: SolverOpts): Vec3[][] {
     this.ensure(targets);
+    // 목표도 dense 로 리샘플(시뮬 점과 1:1 대응).
     const flatTarget: Vec3[] = [];
-    for (const t of targets) for (const p of t) flatTarget.push(p);
+    targets.forEach((t, si) => {
+      const dense = resampleUniform(t, this.denseCounts[si]);
+      for (const p of dense) flatTarget.push(p);
+    });
 
-    const h = Math.min(dt, 0.033);
-    const g = opts.gravity * h * h;
     const N = this.pos.length;
 
-    // 적분 + 중력
+    // 적분(중력 없음 — verlet 관성/감쇠만 → 자연스러운 따라붙음).
     for (let i = 0; i < N; i++) {
       const p = this.pos[i];
       const pr = this.prev[i];
@@ -82,7 +122,7 @@ export class RopeSolver {
       const vy = (p[1] - pr[1]) * opts.damping;
       const vz = (p[2] - pr[2]) * opts.damping;
       this.prev[i] = [p[0], p[1], p[2]];
-      this.pos[i] = [p[0] + vx, p[1] + vy - g * this.endWeight[i], p[2] + vz];
+      this.pos[i] = [p[0] + vx, p[1] + vy, p[2] + vz];
     }
 
     const minDist = this.radius * 2;
@@ -120,7 +160,7 @@ export class RopeSolver {
         }
       }
       // 자기충돌 — 반복 루프에 끼워넣어 스프링과 균형을 이루게(끝에서 한 번보다 효과적).
-      collideAll(this.pos, this.strands, minDist, 3);
+      collideAll(this.pos, this.strands, minDist, 2);
     }
 
     // 가닥별로 분리해 반환

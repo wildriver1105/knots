@@ -15,7 +15,7 @@ import { getKnot } from "@/lib/knots/registry";
 import { buildLoose, knotShape, sliceCurve, interpolatePoses } from "@/lib/knots/interpolate";
 import { RopeSolver, type SolverOpts } from "@/lib/knots/physics";
 import { usePlayerStore } from "@/lib/player/store";
-import { getRopeTextures } from "./ropeTexture";
+import { makeRopeMaterial } from "./ropeTexture";
 
 // 중력 제외. 텐션(비신축)·자기충돌·목표 스프링으로 "당기면 조여지는" 모션.
 const SOLVER: SolverOpts = { gravity: 0, damping: 0.86, spring: 0.3, iterations: 6, collisionIterations: 3 };
@@ -26,20 +26,6 @@ function buildTube(points: Vec3[], radius: number): THREE.TubeGeometry | null {
   const curve = new THREE.CatmullRomCurve3(v, false, "centripetal");
   const seg = Math.min(700, Math.max(24, points.length * 8));
   return new THREE.TubeGeometry(curve, seg, radius, 24, false);
-}
-
-const NORMAL_SCALE = new THREE.Vector2(1.4, 1.4);
-
-function ropeMaterial(color: string, tex: ReturnType<typeof getRopeTextures>): THREE.MeshStandardMaterial {
-  return new THREE.MeshStandardMaterial({
-    color: new THREE.Color(color),
-    metalness: 0,
-    roughness: 1,
-    roughnessMap: tex.roughnessMap,
-    normalMap: tex.normalMap,
-    normalScale: NORMAL_SCALE.clone(),
-    envMapIntensity: 0.95,
-  });
 }
 
 function setGeom(mesh: THREE.Mesh | null, pts: Vec3[], radius: number) {
@@ -72,7 +58,8 @@ export default function Rope() {
     knot.colorSplitIndex != null &&
     knot.colorSplitIndex > 0 &&
     knot.colorSplitIndex < knot.path.length - 1;
-  const split = knot.colorSplitIndex ?? 0;
+  // solver 가 dense 로 리샘플하므로 색 경계는 인덱스가 아니라 "호 비율"로 다룬다.
+  const splitFraction = hasB ? (knot.colorSplitIndex as number) / (knot.path.length - 1) : 0;
   const extras = knot.extraStrands ?? [];
 
   // 가닥 loose/ path
@@ -84,26 +71,22 @@ export default function Rope() {
   }, [knot]);
 
   const solver = useMemo(() => new RopeSolver(r), [knot, r]);
-  const tex = useMemo(() => getRopeTextures(), []);
 
-  // 재질(매듭별 1회 생성)
+  // 재질(매듭별 1회 생성). 캡도 같은 로프 재질을 써서 끝이 자연스럽게.
   const mats = useMemo(() => {
     const m = {
-      mainA: ropeMaterial(knot.ropeColor, tex),
-      mainB: hasB ? ropeMaterial(knot.ropeColorB!, tex) : null,
-      capA: new THREE.MeshStandardMaterial({ color: new THREE.Color(knot.ropeColor), roughness: 0.85 }),
-      capB: new THREE.MeshStandardMaterial({
-        color: new THREE.Color(hasB ? knot.ropeColorB! : knot.ropeColor),
-        roughness: 0.85,
-      }),
+      mainA: makeRopeMaterial(knot.ropeColor),
+      mainB: hasB ? makeRopeMaterial(knot.ropeColorB!) : null,
+      capA: makeRopeMaterial(knot.ropeColor),
+      capB: makeRopeMaterial(hasB ? knot.ropeColorB! : knot.ropeColor),
       extra: extras.map((e) => ({
-        strand: ropeMaterial(e.color, tex),
-        cap: new THREE.MeshStandardMaterial({ color: new THREE.Color(e.color), roughness: 0.85 }),
+        strand: makeRopeMaterial(e.color),
+        cap: makeRopeMaterial(e.color),
       })),
     };
     return m;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [knot, tex, hasB]);
+  }, [knot, hasB]);
 
   // 메시 refs
   const mainARef = useRef<THREE.Mesh>(null);
@@ -150,22 +133,21 @@ export default function Rope() {
     const reveal = knot.poses ? 1 : Math.min(1, 0.1 + form * 0.96);
 
     const mainPts = sliceCurve(result[0], reveal);
-    if (hasB) {
-      if (mainPts.length > split + 1) {
-        if (mainBRef.current) mainBRef.current.visible = true;
-        setGeom(mainARef.current, mainPts.slice(0, split + 1), r);
-        setGeom(mainBRef.current, mainPts.slice(split), r);
-      } else {
-        if (mainBRef.current) mainBRef.current.visible = false;
-        setGeom(mainARef.current, mainPts, r);
-      }
+    // 색 경계 = 노출된 호 안에서 splitFraction 위치(없으면 색A 만).
+    const showB = hasB && reveal > splitFraction + 1e-3;
+    const splitIdx = showB ? Math.round((splitFraction / reveal) * (mainPts.length - 1)) : -1;
+    if (showB && splitIdx > 0 && splitIdx < mainPts.length - 1) {
+      if (mainBRef.current) mainBRef.current.visible = true;
+      setGeom(mainARef.current, mainPts.slice(0, splitIdx + 1), r);
+      setGeom(mainBRef.current, mainPts.slice(splitIdx), r);
     } else {
+      if (mainBRef.current) mainBRef.current.visible = false;
       setGeom(mainARef.current, mainPts, r);
     }
     setCap(capSRef.current, mainPts[0]);
     setCap(capERef.current, mainPts[mainPts.length - 1]);
     if (capERef.current) {
-      const tipColor = hasB && mainPts.length > split + 1 ? knot.ropeColorB! : knot.ropeColor;
+      const tipColor = showB ? knot.ropeColorB! : knot.ropeColor;
       (capERef.current.material as THREE.MeshStandardMaterial).color.set(tipColor);
     }
 

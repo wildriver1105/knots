@@ -14,7 +14,7 @@ import type { Vec3 } from "@/lib/knots/types";
 import { useEditorStore } from "@/lib/editor/store";
 import { RopeSolver, type SolverOpts } from "@/lib/knots/physics";
 import { interpolatePoses } from "@/lib/knots/interpolate";
-import { getRopeTextures } from "./ropeTexture";
+import { makeRopeMaterial } from "./ropeTexture";
 
 const SOLVER: SolverOpts = { gravity: 0, damping: 0.85, spring: 0.4, iterations: 6, collisionIterations: 3 };
 
@@ -48,29 +48,16 @@ export default function EditScene() {
   const r = draft?.ropeRadius ?? 0.075;
   const split = draft?.colorSplitIndex ?? -1;
   const hasB = split > 0 && !!draft?.ropeColorB && split < points.length - 1;
+  // solver dense 출력 → 색 경계는 호 비율로.
+  const splitFraction = hasB && points.length > 1 ? split / (points.length - 1) : 0;
 
-  const tex = useMemo(() => getRopeTextures(), []);
   const solver = useMemo(() => new RopeSolver(r), [draft?.id, r, points.length]);
   const mats = useMemo(
     () => ({
-      A: new THREE.MeshStandardMaterial({
-        color: new THREE.Color(draft?.ropeColor ?? "#e0584b"),
-        roughness: 1,
-        metalness: 0,
-        roughnessMap: tex.roughnessMap,
-        normalMap: tex.normalMap,
-        normalScale: new THREE.Vector2(1.2, 1.2),
-      }),
-      B: new THREE.MeshStandardMaterial({
-        color: new THREE.Color(draft?.ropeColorB ?? "#3f8fce"),
-        roughness: 1,
-        metalness: 0,
-        roughnessMap: tex.roughnessMap,
-        normalMap: tex.normalMap,
-        normalScale: new THREE.Vector2(1.2, 1.2),
-      }),
+      A: makeRopeMaterial(draft?.ropeColor ?? "#e0584b"),
+      B: makeRopeMaterial(draft?.ropeColorB ?? "#3f8fce"),
     }),
-    [draft?.ropeColor, draft?.ropeColorB, tex]
+    [draft?.ropeColor, draft?.ropeColorB]
   );
 
   const tubeARef = useRef<THREE.Mesh>(null);
@@ -94,10 +81,11 @@ export default function EditScene() {
     }
     const result = solver.step([target], dt, SOLVER);
     const settled = result[0];
-    if (hasB) {
+    const splitIdx = hasB ? Math.round(splitFraction * (settled.length - 1)) : -1;
+    if (hasB && splitIdx > 0 && splitIdx < settled.length - 1) {
       if (tubeBRef.current) tubeBRef.current.visible = true;
-      setGeom(tubeARef.current, settled.slice(0, split + 1), r);
-      setGeom(tubeBRef.current, settled.slice(split), r);
+      setGeom(tubeARef.current, settled.slice(0, splitIdx + 1), r);
+      setGeom(tubeBRef.current, settled.slice(splitIdx), r);
     } else {
       if (tubeBRef.current) tubeBRef.current.visible = false;
       setGeom(tubeARef.current, settled, r);
