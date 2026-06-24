@@ -43,6 +43,8 @@ export interface Step {
 
 export interface Knot {
   id: KnotId | string; // 빌트인 KnotId 또는 커스텀 매듭 id
+  /** 빌트인 데이터 교정 버전. 파일 저장소의 오래된 데모를 안전하게 마이그레이션한다. */
+  builtinRevision?: number;
   name: string;
   blurb: string;
   difficulty: 1 | 2 | 3;
@@ -71,6 +73,17 @@ export interface Knot {
   object: KnotObjectDef;
   /** 연속 모드 step 당 기본 트윈 시간(초). */
   defaultStepDuration: number;
+  /** 로프 물리 튜닝. 생략하면 재질감이 자연스러운 기본값을 사용한다. */
+  physics?: {
+    /** 0=느슨함, 1=강하게 당겨 팽팽함. */
+    tension?: number;
+    /** 아래 방향 가속도(씬 단위). */
+    gravity?: number;
+    /** 굽힘 저항. 0은 매우 유연, 1은 뻣뻣한 로프. */
+    bendStiffness?: number;
+    /** 속도 감쇠. 0..1. */
+    damping?: number;
+  };
   /** 순서 있는 step 목록. reveal 은 단조 증가, 마지막은 1. */
   steps: Step[];
 

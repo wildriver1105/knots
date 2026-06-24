@@ -5,7 +5,7 @@
 
 import { getKnot } from "@/lib/knots/registry";
 import { usePlayerStore } from "@/lib/player/store";
-import type { Vec3 } from "@/lib/knots/types";
+import type { KnotObjectDef, Vec3 } from "@/lib/knots/types";
 
 const WOOD = "#9a7b4f";
 const METAL = "#c8ccd2";
@@ -56,9 +56,9 @@ function Cleat({ scale = 1, position }: { scale?: number; position?: Vec3 }) {
   );
 }
 
-export default function KnotObject() {
+export default function KnotObject({ object }: { object?: KnotObjectDef }) {
   const knotId = usePlayerStore((s) => s.knotId);
-  const obj = getKnot(knotId).object;
+  const obj = object ?? getKnot(knotId).object;
   if (obj.kind === "pole") {
     return <Pole radius={obj.radius} height={obj.height} position={obj.position} axis={obj.axis ?? "y"} />;
   }

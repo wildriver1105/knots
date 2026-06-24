@@ -9,7 +9,7 @@ import { create } from "zustand";
 import type { Knot, Vec3 } from "@/lib/knots/types";
 import { newCustomKnot, syncCustomKnot } from "@/lib/knots/custom";
 import { buildStraightBaseline, formStaged } from "@/lib/knots/interpolate";
-import { relaxPoints } from "@/lib/knots/physics";
+import { collidersForObject, relaxPoints } from "@/lib/knots/physics";
 import { BUILTIN_IDS } from "@/lib/knots/data";
 import { useKnotsRepo } from "@/lib/knots/repo";
 
@@ -57,6 +57,7 @@ interface EditorState {
   setColorSplitHere: () => void;
   setColors: (a: string, b: string) => void;
   setName: (name: string) => void;
+  setPhysics: (key: "tension" | "gravity" | "bendStiffness" | "damping", value: number) => void;
   save: () => string | null;
 }
 
@@ -232,7 +233,7 @@ export const useEditorStore = create<EditorState>((set, get) => {
       snapshot();
       const step = get().activeStep;
       const poses = d.poses.map((p) => p.map((q) => [...q] as Vec3));
-      poses[step] = relaxPoints(poses[step], d.ropeRadius);
+      poses[step] = relaxPoints(poses[step], d.ropeRadius, 80, collidersForObject(d.object));
       set({ draft: { ...d, poses } });
     },
 
@@ -256,6 +257,13 @@ export const useEditorStore = create<EditorState>((set, get) => {
       if (!d) return;
       snapshot("name");
       set({ draft: { ...d, name } });
+    },
+
+    setPhysics: (key, value) => {
+      const d = get().draft;
+      if (!d) return;
+      snapshot("physics:" + key);
+      set({ draft: { ...d, physics: { ...d.physics, [key]: value } } });
     },
 
     save: () => {

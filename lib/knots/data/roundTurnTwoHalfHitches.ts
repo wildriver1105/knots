@@ -37,6 +37,7 @@ const path: Vec3[] = join(standing, roundTurn, hitches);
 
 export const roundTurnTwoHalfHitches: Knot = {
   id: "round-turn-two-half-hitches",
+  builtinRevision: 3,
   name: "Round Turn & Two Half Hitches",
   blurb: "지속 하중을 견디는 견고한 히치. 무어링 링이나 말뚝에 배를 묶을 때 신뢰도 높다.",
   difficulty: 2,
@@ -46,6 +47,8 @@ export const roundTurnTwoHalfHitches: Knot = {
   colorSplitIndex: splitAt,
   ropeRadius: 0.07,
   object: { kind: "pole", radius: RP, height: 3.4, axis: "y" },
+  layDir: [1, 0, 0],
+  layCenter: [0, -0.15, 1.15],
   defaultStepDuration: 1.4,
   steps: [
     { id: "round", title: "Round turn", instruction: "말뚝을 완전히 두 바퀴 감는다 — 마찰이 하중을 받친다.", reveal: 0.55 },

@@ -30,6 +30,7 @@ const path: Vec3[] = join(tailIn, turn1, cross, turn2, tuck, tailOut);
 
 export const cloveHitch: Knot = {
   id: "clove-hitch",
+  builtinRevision: 3,
   name: "Clove Hitch",
   blurb: "말뚝·레일에 빠르게 매고 푸는 히치. 페인더/펜더를 임시로 고정할 때 흔히 쓴다.",
   difficulty: 1,
@@ -39,6 +40,9 @@ export const cloveHitch: Knot = {
   colorSplitIndex: Math.floor(path.length * 0.5),
   ropeRadius: 0.07,
   object: { kind: "pole", radius: RP, height: 3.4, axis: "y" },
+  // 에디터의 느슨한 시작 줄도 말뚝 앞에 놓아 처음부터 물체를 관통하지 않게 한다.
+  layDir: [1, 0, 0],
+  layCenter: [0, -0.1, 1.0],
   defaultStepDuration: 1.4,
   steps: [
     { id: "approach", title: "First wrap", instruction: "working end 를 말뚝 뒤로 한 바퀴 감는다.", reveal: 0.38 },

@@ -18,6 +18,7 @@ import { useEditorStore } from "@/lib/editor/store";
 
 export default function SceneCanvas({ showDebug = false }: { showDebug?: boolean }) {
   const editing = useEditorStore((s) => s.editing);
+  const draftObject = useEditorStore((s) => s.draft?.object);
   return (
     <Canvas
       shadows
@@ -29,7 +30,10 @@ export default function SceneCanvas({ showDebug = false }: { showDebug?: boolean
         <Lighting />
         <group position={[0, 0, 0]}>
           {editing ? (
-            <EditScene />
+            <>
+              {draftObject && <KnotObject object={draftObject} />}
+              <EditScene />
+            </>
           ) : (
             <>
               <KnotObject />

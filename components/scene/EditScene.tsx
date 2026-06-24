@@ -12,11 +12,9 @@ import * as THREE from "three";
 import { TransformControls } from "@react-three/drei";
 import type { Vec3 } from "@/lib/knots/types";
 import { useEditorStore } from "@/lib/editor/store";
-import { RopeSolver, type SolverOpts } from "@/lib/knots/physics";
+import { RopeSolver, collidersForObject, solverOptionsForKnot } from "@/lib/knots/physics";
 import { interpolatePoses } from "@/lib/knots/interpolate";
 import { makeRopeMaterial } from "./ropeTexture";
-
-const SOLVER: SolverOpts = { gravity: 0, damping: 0.85, spring: 0.4, iterations: 6, collisionIterations: 3 };
 
 function tube(points: Vec3[], radius: number): THREE.TubeGeometry | null {
   if (points.length < 2) return null;
@@ -52,6 +50,7 @@ export default function EditScene() {
   const splitFraction = hasB && points.length > 1 ? split / (points.length - 1) : 0;
 
   const solver = useMemo(() => new RopeSolver(r), [draft?.id, r, points.length]);
+  const colliders = useMemo(() => collidersForObject(draft?.object ?? { kind: "none" }), [draft?.object]);
   const mats = useMemo(
     () => ({
       A: makeRopeMaterial(draft?.ropeColor ?? "#e0584b"),
@@ -79,7 +78,8 @@ export default function EditScene() {
       if (st.previewPlaying) st.tickPreview(Math.min(dt, 0.05));
       target = interpolatePoses(draft.poses, useEditorStore.getState().previewProgress);
     }
-    const result = solver.step([target], dt, SOLVER);
+    const formation = st.preview ? st.previewProgress : activeStep / Math.max(1, draft.poses.length - 1);
+    const result = solver.step([target], dt, solverOptionsForKnot(draft, formation), colliders);
     const settled = result[0];
     const splitIdx = hasB ? Math.round(splitFraction * (settled.length - 1)) : -1;
     if (hasB && splitIdx > 0 && splitIdx < settled.length - 1) {

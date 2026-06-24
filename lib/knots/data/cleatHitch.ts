@@ -41,6 +41,7 @@ const path: Vec3[] = [
 
 export const cleatHitch: Knot = {
   id: "cleat-hitch",
+  builtinRevision: 2,
   name: "Cleat Hitch",
   blurb: "도크라인을 혼 클리트에 고정하는 표준 방법. 하중을 받아도 안 풀리고 빠르게 푼다.",
   difficulty: 2,

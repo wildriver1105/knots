@@ -26,6 +26,7 @@ export default function EditorPanel() {
   const setColorSplitHere = useEditorStore((s) => s.setColorSplitHere);
   const setColors = useEditorStore((s) => s.setColors);
   const setName = useEditorStore((s) => s.setName);
+  const setPhysics = useEditorStore((s) => s.setPhysics);
   const save = useEditorStore((s) => s.save);
   const stop = useEditorStore((s) => s.stop);
   const resetBuiltin = useEditorStore((s) => s.resetBuiltin);
@@ -153,6 +154,24 @@ export default function EditorPanel() {
         <button className="ed-mini" disabled={selected == null} onClick={setColorSplitHere} title="선택한 점부터 색2">
           색 경계 ⟂
         </button>
+      </div>
+
+      <div className="ed-physics">
+        <label>
+          <span>장력 <b>{Math.round((draft.physics?.tension ?? 0.72) * 100)}%</b></span>
+          <input type="range" min={0} max={1} step={0.01} value={draft.physics?.tension ?? 0.72}
+            onChange={(e) => setPhysics("tension", Number(e.target.value))} />
+        </label>
+        <label>
+          <span>중력 <b>{(draft.physics?.gravity ?? 0.55).toFixed(1)}</b></span>
+          <input type="range" min={0} max={2} step={0.05} value={draft.physics?.gravity ?? 0.55}
+            onChange={(e) => setPhysics("gravity", Number(e.target.value))} />
+        </label>
+        <label>
+          <span>굽힘 저항 <b>{Math.round((draft.physics?.bendStiffness ?? 0.18) * 100)}%</b></span>
+          <input type="range" min={0} max={1} step={0.01} value={draft.physics?.bendStiffness ?? 0.18}
+            onChange={(e) => setPhysics("bendStiffness", Number(e.target.value))} />
+        </label>
       </div>
 
       <div className="ed-steps-label">스텝 (드래그한 모양이 단계별로 저장됨)</div>

@@ -13,12 +13,9 @@ import * as THREE from "three";
 import type { Vec3 } from "@/lib/knots/types";
 import { getKnot } from "@/lib/knots/registry";
 import { buildLoose, knotShape, sliceCurve, interpolatePoses } from "@/lib/knots/interpolate";
-import { RopeSolver, type SolverOpts } from "@/lib/knots/physics";
+import { RopeSolver, collidersForObject, solverOptionsForKnot } from "@/lib/knots/physics";
 import { usePlayerStore } from "@/lib/player/store";
 import { makeRopeMaterial } from "./ropeTexture";
-
-// 중력 제외. 텐션(비신축)·자기충돌·목표 스프링으로 "당기면 조여지는" 모션.
-const SOLVER: SolverOpts = { gravity: 0, damping: 0.86, spring: 0.3, iterations: 6, collisionIterations: 3 };
 
 function buildTube(points: Vec3[], radius: number): THREE.TubeGeometry | null {
   if (points.length < 2) return null;
@@ -71,6 +68,7 @@ export default function Rope() {
   }, [knot]);
 
   const solver = useMemo(() => new RopeSolver(r), [knot, r]);
+  const colliders = useMemo(() => collidersForObject(knot.object), [knot]);
 
   // 재질(매듭별 1회 생성). 캡도 같은 로프 재질을 써서 끝이 자연스럽게.
   const mats = useMemo(() => {
@@ -105,7 +103,10 @@ export default function Rope() {
     prevKnot.current = knotId;
     formRef.current = target;
     const targets = strands.map((s) => knotShape(s.loose, s.path, target, knot.formReverse));
-    solver.snap(targets);
+    const restTargets = knot.poses
+      ? [knot.poses[knot.poses.length - 1] ?? knot.path]
+      : strands.map((s) => s.path);
+    solver.snap(targets, restTargets);
   }
 
   // 언마운트 시 지오메트리 정리
@@ -127,10 +128,11 @@ export default function Rope() {
     const targets = knot.poses
       ? [interpolatePoses(knot.poses, form)]
       : strands.map((s) => knotShape(s.loose, s.path, form, knot.formReverse));
-    const result = solver.step(targets, dt, SOLVER);
+    const result = solver.step(targets, dt, solverOptionsForKnot(knot, form), colliders);
 
-    // 빌트인: 손 순서대로 점점 드러남. 커스텀: 줄 전체가 포즈 사이를 움직임(reveal 1).
-    const reveal = knot.poses ? 1 : Math.min(1, 0.1 + form * 0.96);
+    // 실제 로프처럼 전체 길이를 항상 유지한다. 단계는 잘라내기(reveal)가 아니라
+    // 느슨한 포즈에서 완성 포즈로 이동하고 장력이 올라가는 과정이다.
+    const reveal = 1;
 
     const mainPts = sliceCurve(result[0], reveal);
     // 색 경계 = 노출된 호 안에서 splitFraction 위치(없으면 색A 만).

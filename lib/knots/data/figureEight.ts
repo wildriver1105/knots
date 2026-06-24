@@ -38,6 +38,7 @@ const path: Vec3[] = [
 
 export const figureEight: Knot = {
   id: "figure-eight",
+  builtinRevision: 2,
   name: "Figure-Eight",
   blurb:
     "기본 멈춤 매듭(stopper). 로프가 블록·페어리드를 빠져나가지 않게 끝에 묶는다. 풀기 쉽고 절대 엉키지 않는다.",

@@ -9,40 +9,45 @@
 
 import type { Knot, Vec3 } from "../types";
 
-const Z = 0.19; // over/under 깊이(로프 반경보다 충분히 큼)
+const Z = 0.24; // over/under 깊이(로프 지름보다 충분히 큼)
 
 // 파랑 로프: 위-왼 끝 → (앞,위) → 오른쪽 정점 → (뒤,아래) → 아래-왼 끝
 const blue: Vec3[] = [
-  [-1.7, 0.3, 0.0],
-  [-0.9, 0.29, 0.05],
-  [-0.35, 0.24, Z],
-  [0.05, 0.16, Z],
-  [0.33, 0.05, Z * 0.6],
-  [0.42, -0.02, 0.0], // 우측 정점
-  [0.33, -0.09, -Z * 0.6],
-  [0.05, -0.18, -Z],
-  [-0.35, -0.25, -Z],
-  [-0.9, -0.29, -0.05],
-  [-1.7, -0.3, 0.0],
+  [-1.65, 0.46, 0.0],
+  [-1.05, 0.45, 0.02],
+  [-0.62, 0.38, Z * 0.5],
+  [-0.2, 0.28, Z],
+  [0.28, 0.2, Z],
+  [0.64, 0.08, Z * 0.5],
+  [0.72, 0.0, 0.0], // 우측 정점
+  [0.64, -0.08, -Z * 0.5],
+  [0.28, -0.2, -Z],
+  [-0.2, -0.28, -Z],
+  [-0.62, -0.38, -Z * 0.5],
+  [-1.05, -0.45, -0.02],
+  [-1.65, -0.46, 0.0],
 ];
 
 // 빨강 로프: 아래-오른 끝 → (앞,아래) → 왼쪽 정점 → (뒤,위) → 위-오른 끝
 const red: Vec3[] = [
-  [1.7, -0.3, 0.0],
-  [0.9, -0.29, 0.05],
-  [0.35, -0.24, Z],
-  [-0.05, -0.16, Z],
-  [-0.33, -0.05, Z * 0.6],
-  [-0.42, 0.02, 0.0], // 좌측 정점
-  [-0.33, 0.09, -Z * 0.6],
-  [-0.05, 0.18, -Z],
-  [0.35, 0.25, -Z],
-  [0.9, 0.29, -0.05],
-  [1.7, 0.3, 0.0],
+  [1.65, -0.46, 0.0],
+  [1.05, -0.45, 0.02],
+  [0.62, -0.38, Z * 0.5],
+  [0.2, -0.28, Z],
+  [-0.28, -0.2, Z],
+  [-0.64, -0.08, Z * 0.5],
+  [-0.72, 0.0, 0.0], // 좌측 정점
+  [-0.64, 0.08, -Z * 0.5],
+  [-0.28, 0.2, -Z],
+  [0.2, 0.28, -Z],
+  [0.62, 0.38, -Z * 0.5],
+  [1.05, 0.45, -0.02],
+  [1.65, 0.46, 0.0],
 ];
 
 export const squareKnot: Knot = {
   id: "square-knot",
+  builtinRevision: 3,
   name: "Square (Reef) Knot",
   blurb: "굵기가 같은 두 줄을 잇거나 돛을 묶을 때(reef). 좌상우, 우상좌 — 대칭이라 평평하게 눕는다.",
   difficulty: 1,
@@ -54,9 +59,9 @@ export const squareKnot: Knot = {
   formReverse: false,
   defaultStepDuration: 1.3,
   steps: [
-    { id: "lay", title: "Lay the ropes", instruction: "두 로프 끝을 나란히 놓는다. 왼손 줄(파랑), 오른손 줄(빨강).", reveal: 0.4 },
-    { id: "first", title: "Left over right", instruction: "왼쪽 끝을 오른쪽 위로 교차해 한 번 감는다.", reveal: 0.66 },
-    { id: "second", title: "Right over left", instruction: "이번엔 오른쪽 끝을 왼쪽 위로 교차해 감는다 — 대칭이 핵심.", reveal: 0.85 },
-    { id: "dress", title: "Pull tight", instruction: "네 가닥을 당겨 평평하게 조인다. 비대칭이면 granny(잘못된 매듭).", reveal: 1 },
+    { id: "lay", title: "Lay the ropes", instruction: "두 로프 끝을 나란히 놓는다. 왼손 줄(파랑), 오른손 줄(빨강).", reveal: 0.4, camera: { position: [0, 0.25, 5], target: [0, 0, 0] } },
+    { id: "first", title: "Left over right", instruction: "왼쪽 끝을 오른쪽 위로 교차해 한 번 감는다.", reveal: 0.66, camera: { position: [0, 0.25, 5], target: [0, 0, 0] } },
+    { id: "second", title: "Right over left", instruction: "이번엔 오른쪽 끝을 왼쪽 위로 교차해 감는다 — 대칭이 핵심.", reveal: 0.85, camera: { position: [0, 0.25, 5], target: [0, 0, 0] } },
+    { id: "dress", title: "Pull tight", instruction: "같은 색의 두 끝이 같은 쪽으로 나가도록 네 가닥을 당겨 평평하게 정돈한다. 비대칭이면 granny knot다.", reveal: 1, camera: { position: [0, 0.25, 5], target: [0, 0, 0] } },
   ],
 };

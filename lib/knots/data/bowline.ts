@@ -37,6 +37,7 @@ const path: Vec3[] = [
 
 export const bowline: Knot = {
   id: "bowline",
+  builtinRevision: 2,
   name: "Bowline",
   blurb: "끝에 절대 미끄러지지 않는 고정 고리를 만든다. 하중 후에도 쉽게 풀려 '매듭의 왕'으로 불린다.",
   difficulty: 3,

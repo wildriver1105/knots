@@ -29,12 +29,21 @@ async function readAll(): Promise<Knot[]> {
     await writeAll(knots);
     return knots;
   }
-  // 빌트인 시드 중 파일에 없는 게 있으면 추가(코드에 새 빌트인이 생긴 경우).
+  // 새 빌트인은 추가하고, 형상 교정 버전이 올라간 빌트인은 새 시드로 마이그레이션한다.
+  // 같은 revision의 에디터 수정본은 그대로 보존한다.
   const have = new Set(knots.map((k) => k.id));
   let changed = false;
   for (const s of BUILTIN_SEED) {
     if (!have.has(s.id)) {
       knots.push(s);
+      changed = true;
+      continue;
+    }
+    const index = knots.findIndex((k) => k.id === s.id);
+    const storedRevision = knots[index].builtinRevision ?? 0;
+    const seedRevision = s.builtinRevision ?? 0;
+    if (storedRevision < seedRevision) {
+      knots[index] = s;
       changed = true;
     }
   }

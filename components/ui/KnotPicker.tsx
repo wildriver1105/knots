@@ -9,6 +9,19 @@ import { useEditorStore } from "@/lib/editor/store";
 
 const DIFF_LABEL = ["", "쉬움", "보통", "어려움"];
 
+function canonical(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonical);
+  if (value && typeof value === "object") {
+    return Object.keys(value as Record<string, unknown>)
+      .sort()
+      .reduce<Record<string, unknown>>((out, key) => {
+        out[key] = canonical((value as Record<string, unknown>)[key]);
+        return out;
+      }, {});
+  }
+  return value;
+}
+
 export default function KnotPicker() {
   const knotId = usePlayerStore((s) => s.knotId);
   const loadKnot = usePlayerStore((s) => s.loadKnot);
@@ -21,7 +34,8 @@ export default function KnotPicker() {
   // 로드 전엔 시드로 표시(빈 화면 방지).
   const knots = loaded && repoKnots.length ? repoKnots : BUILTIN_SEED;
   const isEdited = (id: string) =>
-    BUILTIN_IDS.has(id) && JSON.stringify(knots.find((k) => k.id === id)) !== JSON.stringify(SEED_BY_ID[id]);
+    BUILTIN_IDS.has(id) &&
+    JSON.stringify(canonical(knots.find((k) => k.id === id))) !== JSON.stringify(canonical(SEED_BY_ID[id]));
 
   return (
     <div className="knot-picker">

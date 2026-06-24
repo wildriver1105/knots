@@ -36,7 +36,7 @@ export default function KnotApp() {
   const hydrate = useKnotsRepo((s) => s.hydrate);
   useEffect(() => {
     validateAllKnots(BUILTIN_SEED);
-    hydrate(); // 파일(/api/knots)에서 전체 매듭 로드
+    void hydrate().then(() => validateAllKnots(useKnotsRepo.getState().knots));
   }, [hydrate]);
 
   const knotId = usePlayerStore((s) => s.knotId);
