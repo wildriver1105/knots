@@ -85,6 +85,7 @@ export class RopeSolver {
       this.pos[i] = [p[0] + vx, p[1] + vy - g * this.endWeight[i], p[2] + vz];
     }
 
+    const minDist = this.radius * 2;
     for (let it = 0; it < opts.iterations; it++) {
       // 목표 스프링
       for (let i = 0; i < N; i++) {
@@ -118,37 +119,8 @@ export class RopeSolver {
           b[2] -= dz * diff;
         }
       }
-    }
-
-    // 자기충돌: 모든 점쌍, 같은 가닥 인접(±SKIP)은 제외.
-    const minDist = this.radius * 2 * 0.92;
-    const minSq = minDist * minDist;
-    const SKIP = 3;
-    for (let it = 0; it < opts.collisionIterations; it++) {
-      for (let i = 0; i < N; i++) {
-        const a = this.pos[i];
-        for (let j = i + 1; j < N; j++) {
-          // 같은 가닥에서 가까운 이웃은 건너뜀(자연스러운 곡률 유지)
-          if (this.sameStrandClose(i, j, SKIP)) continue;
-          const b = this.pos[j];
-          const dx = b[0] - a[0];
-          const dy = b[1] - a[1];
-          const dz = b[2] - a[2];
-          const d2 = dx * dx + dy * dy + dz * dz;
-          if (d2 >= minSq || d2 < 1e-9) continue;
-          const d = Math.sqrt(d2);
-          const push = ((minDist - d) / d) * 0.5;
-          const px = dx * push;
-          const py = dy * push;
-          const pz = dz * push;
-          a[0] -= px;
-          a[1] -= py;
-          a[2] -= pz;
-          b[0] += px;
-          b[1] += py;
-          b[2] += pz;
-        }
-      }
+      // 자기충돌 — 반복 루프에 끼워넣어 스프링과 균형을 이루게(끝에서 한 번보다 효과적).
+      collideAll(this.pos, this.strands, minDist, 3);
     }
 
     // 가닥별로 분리해 반환
@@ -162,14 +134,83 @@ export class RopeSolver {
     });
     return out;
   }
+}
 
-  private sameStrandClose(i: number, j: number, skip: number): boolean {
-    for (const s of this.strands) {
-      const inS = i >= s.start && i < s.start + s.count;
-      const jnS = j >= s.start && j < s.start + s.count;
-      if (inS && jnS) return Math.abs(i - j) <= skip;
-      if (inS || jnS) return false;
-    }
-    return false;
+// ── 충돌/이완 헬퍼(클래스 밖, 에디터에서도 재사용) ──
+
+function inStrandClose(strands: { start: number; count: number }[], i: number, j: number, skip: number): boolean {
+  for (const s of strands) {
+    const inS = i >= s.start && i < s.start + s.count;
+    const jnS = j >= s.start && j < s.start + s.count;
+    if (inS && jnS) return Math.abs(i - j) <= skip;
+    if (inS || jnS) return false;
   }
+  return false;
+}
+
+/** 모든 점쌍이 minDist 보다 가까우면 밀어낸다(같은 가닥 인접 ±skip 제외). pos 를 제자리 수정. */
+function collideAll(pos: Vec3[], strands: { start: number; count: number }[], minDist: number, skip: number): void {
+  const minSq = minDist * minDist;
+  const N = pos.length;
+  for (let i = 0; i < N; i++) {
+    const a = pos[i];
+    for (let j = i + 1; j < N; j++) {
+      if (inStrandClose(strands, i, j, skip)) continue;
+      const b = pos[j];
+      const dx = b[0] - a[0];
+      const dy = b[1] - a[1];
+      const dz = b[2] - a[2];
+      const d2 = dx * dx + dy * dy + dz * dz;
+      if (d2 >= minSq || d2 < 1e-9) continue;
+      const d = Math.sqrt(d2);
+      const push = ((minDist - d) / d) * 0.5;
+      a[0] -= dx * push;
+      a[1] -= dy * push;
+      a[2] -= dz * push;
+      b[0] += dx * push;
+      b[1] += dy * push;
+      b[2] += dz * push;
+    }
+  }
+}
+
+/**
+ * 한 가닥(에디터 포즈)을 "물리 정리": 전체 모양은 약한 스프링으로 유지하고, 줄 길이(비신축)와
+ * 자기충돌을 강하게 적용해 겹친 가닥을 접촉 거리까지 밀어낸다. 결과 점 배열 반환(원본 불변).
+ */
+export function relaxPoints(points: Vec3[], radius: number, iterations = 60): Vec3[] {
+  const n = points.length;
+  if (n < 3) return points.map((p) => [p[0], p[1], p[2]] as Vec3);
+  const pos: Vec3[] = points.map((p) => [p[0], p[1], p[2]] as Vec3);
+  const orig: Vec3[] = points.map((p) => [p[0], p[1], p[2]] as Vec3);
+  const rest: number[] = [];
+  for (let i = 0; i < n - 1; i++) {
+    rest.push(Math.hypot(orig[i + 1][0] - orig[i][0], orig[i + 1][1] - orig[i][1], orig[i + 1][2] - orig[i][2]));
+  }
+  const minDist = radius * 2;
+  const strands = [{ start: 0, count: n }];
+  for (let it = 0; it < iterations; it++) {
+    for (let i = 0; i < n; i++) {
+      pos[i][0] += (orig[i][0] - pos[i][0]) * 0.05;
+      pos[i][1] += (orig[i][1] - pos[i][1]) * 0.05;
+      pos[i][2] += (orig[i][2] - pos[i][2]) * 0.05;
+    }
+    for (let i = 0; i < n - 1; i++) {
+      const a = pos[i];
+      const b = pos[i + 1];
+      const dx = b[0] - a[0];
+      const dy = b[1] - a[1];
+      const dz = b[2] - a[2];
+      const dl = Math.hypot(dx, dy, dz) || 1e-6;
+      const diff = (dl - rest[i]) / dl / 2;
+      a[0] += dx * diff;
+      a[1] += dy * diff;
+      a[2] += dz * diff;
+      b[0] -= dx * diff;
+      b[1] -= dy * diff;
+      b[2] -= dz * diff;
+    }
+    collideAll(pos, strands, minDist, 3);
+  }
+  return pos;
 }

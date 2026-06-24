@@ -4,12 +4,17 @@
 // 스텝 탭에서 스텝을 고르고, 3D 에서 점을 클릭→기즈모로 끌어 그 스텝의 줄 모양을 잡는다.
 // 저장 시 스텝 사이를 보간하는 애니메이션이 된다. 빌트인은 "기본값 복원" 가능.
 
+import { useEffect } from "react";
 import { useEditorStore } from "@/lib/editor/store";
 import { usePlayerStore } from "@/lib/player/store";
 
 export default function EditorPanel() {
   const draft = useEditorStore((s) => s.draft);
   const isBuiltin = useEditorStore((s) => s.isBuiltin);
+  const undo = useEditorStore((s) => s.undo);
+  const redo = useEditorStore((s) => s.redo);
+  const canUndo = useEditorStore((s) => s.past.length > 0);
+  const canRedo = useEditorStore((s) => s.future.length > 0);
   const activeStep = useEditorStore((s) => s.activeStep);
   const selected = useEditorStore((s) => s.selected);
   const setActiveStep = useEditorStore((s) => s.setActiveStep);
@@ -17,6 +22,7 @@ export default function EditorPanel() {
   const addStep = useEditorStore((s) => s.addStep);
   const removeStep = useEditorStore((s) => s.removeStep);
   const duplicatePrevPose = useEditorStore((s) => s.duplicatePrevPose);
+  const relaxPose = useEditorStore((s) => s.relaxPose);
   const setColorSplitHere = useEditorStore((s) => s.setColorSplitHere);
   const setColors = useEditorStore((s) => s.setColors);
   const setName = useEditorStore((s) => s.setName);
@@ -24,6 +30,25 @@ export default function EditorPanel() {
   const stop = useEditorStore((s) => s.stop);
   const resetBuiltin = useEditorStore((s) => s.resetBuiltin);
   const loadKnot = usePlayerStore((s) => s.loadKnot);
+
+  // 단축키: ⌘/Ctrl+Z = undo, ⌘/Ctrl+Shift+Z 또는 Ctrl+Y = redo
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const mod = e.metaKey || e.ctrlKey;
+      if (!mod) return;
+      const k = e.key.toLowerCase();
+      if (k === "z") {
+        e.preventDefault();
+        if (e.shiftKey) redo();
+        else undo();
+      } else if (k === "y") {
+        e.preventDefault();
+        redo();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [undo, redo]);
 
   if (!draft) return null;
   const step = draft.steps[activeStep];
@@ -51,6 +76,15 @@ export default function EditorPanel() {
           placeholder="매듭 이름"
         />
         {isBuiltin && <span className="ed-badge">기본 매듭</span>}
+      </div>
+
+      <div className="ed-row ed-undo">
+        <button className="ed-mini" onClick={undo} disabled={!canUndo} title="실행 취소 (⌘/Ctrl+Z)">
+          ↶ 되돌리기
+        </button>
+        <button className="ed-mini" onClick={redo} disabled={!canRedo} title="다시 실행 (⌘/Ctrl+Shift+Z)">
+          ↷ 다시
+        </button>
       </div>
 
       <div className="ed-colors">
@@ -96,6 +130,9 @@ export default function EditorPanel() {
       />
 
       <div className="ed-row ed-actions">
+        <button className="ed-mini ed-mini--accent" onClick={relaxPose} title="이 스텝을 충돌·장력 물리로 정리(겹친 가닥 분리)">
+          ⚙ 물리 정리
+        </button>
         <button className="ed-mini" disabled={activeStep === 0} onClick={duplicatePrevPose} title="이전 스텝 포즈로 초기화">
           이전 포즈 복제
         </button>

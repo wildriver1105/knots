@@ -39,6 +39,7 @@ export default function EditScene() {
   const selected = useEditorStore((s) => s.selected);
   const select = useEditorStore((s) => s.select);
   const movePoint = useEditorStore((s) => s.movePoint);
+  const beginChange = useEditorStore((s) => s.beginChange);
   const [handle, setHandle] = useState<THREE.Mesh | null>(null);
 
   const points = draft?.poses?.[activeStep] ?? [];
@@ -144,6 +145,7 @@ export default function EditScene() {
           object={handle}
           mode="translate"
           size={1.5}
+          onMouseDown={() => beginChange()}
           onObjectChange={() => {
             if (selected == null) return;
             movePoint(selected, [handle.position.x, handle.position.y, handle.position.z]);

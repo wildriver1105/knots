@@ -564,6 +564,10 @@ body {
   opacity: 0.4;
   cursor: default;
 }
+.ed-mini--accent {
+  border-color: rgba(74, 163, 224, 0.5);
+  color: var(--accent);
+}
 .ed-actions {
   flex-wrap: wrap;
 }
