@@ -22,6 +22,11 @@ interface EditorState {
   activeStep: number;
   selected: number | null;
 
+  // 미리보기(에디터 안에서 애니메이션 재생)
+  preview: boolean;
+  previewPlaying: boolean;
+  previewProgress: number;
+
   past: Knot[];
   future: Knot[];
   lastKey: string | null; // 연속 입력 coalesce 용
@@ -34,6 +39,12 @@ interface EditorState {
   beginChange: () => void; // 드래그 시작 시 스냅샷
   undo: () => void;
   redo: () => void;
+
+  togglePreview: () => void;
+  playPreview: () => void;
+  pausePreview: () => void;
+  setPreviewProgress: (p: number) => void;
+  tickPreview: (dt: number) => void;
 
   setActiveStep: (i: number) => void;
   select: (i: number | null) => void;
@@ -95,6 +106,9 @@ export const useEditorStore = create<EditorState>((set, get) => {
     isBuiltin: false,
     activeStep: 0,
     selected: null,
+    preview: false,
+    previewPlaying: false,
+    previewProgress: 0,
     past: [],
     future: [],
     lastKey: null,
@@ -102,24 +116,41 @@ export const useEditorStore = create<EditorState>((set, get) => {
     startNew: (name) => {
       const draft = newCustomKnot(name);
       const mid = Math.floor((draft.poses?.[0]?.length ?? 2) / 2);
-      set({ editing: true, draft, isBuiltin: false, activeStep: 0, selected: mid, past: [], future: [], lastKey: null });
+      set({ editing: true, draft, isBuiltin: false, activeStep: 0, selected: mid, past: [], future: [], lastKey: null, preview: false, previewPlaying: false, previewProgress: 0 });
     },
 
     startEdit: (knot) => {
       const d = ensurePoses(clone(knot));
       const isBuiltin = BUILTIN_IDS.has(knot.id);
       const mid = Math.floor((d.poses?.[0]?.length ?? 2) / 2);
-      set({ editing: true, draft: d, isBuiltin, activeStep: 0, selected: mid, past: [], future: [], lastKey: null });
+      set({ editing: true, draft: d, isBuiltin, activeStep: 0, selected: mid, past: [], future: [], lastKey: null, preview: false, previewPlaying: false, previewProgress: 0 });
     },
 
-    stop: () => set({ editing: false, draft: null, selected: null, past: [], future: [], lastKey: null }),
+    stop: () => set({ editing: false, draft: null, selected: null, past: [], future: [], lastKey: null, preview: false, previewPlaying: false }),
 
     resetBuiltin: () => {
       const d = get().draft;
       if (!d) return null;
       void useKnotsRepo.getState().remove(d.id);
-      set({ editing: false, draft: null, selected: null, past: [], future: [], lastKey: null });
+      set({ editing: false, draft: null, selected: null, past: [], future: [], lastKey: null, preview: false, previewPlaying: false });
       return d.id;
+    },
+
+    togglePreview: () => {
+      const on = !get().preview;
+      set({ preview: on, previewPlaying: on, previewProgress: 0, selected: on ? null : get().selected });
+    },
+    playPreview: () => set((s) => ({ previewPlaying: true, previewProgress: s.previewProgress >= 1 ? 0 : s.previewProgress })),
+    pausePreview: () => set({ previewPlaying: false }),
+    setPreviewProgress: (p) => set({ previewProgress: Math.min(1, Math.max(0, p)), previewPlaying: false }),
+    tickPreview: (dt) => {
+      const s = get();
+      if (!s.previewPlaying || !s.draft?.poses) return;
+      const K = s.draft.poses.length;
+      const total = Math.max(0.6, (K - 1) * (s.draft.defaultStepDuration || 1));
+      const np = s.previewProgress + dt / total;
+      if (np >= 1) set({ previewProgress: 1, previewPlaying: false });
+      else set({ previewProgress: np });
     },
 
     beginChange: () => snapshot(),

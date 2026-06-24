@@ -579,7 +579,17 @@ body {
 }
 .ed-save {
   justify-content: flex-end;
+  flex-wrap: wrap;
   margin-top: 2px;
+}
+.ed-save-ghost {
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
+  font-weight: 700;
+  padding: 9px 16px;
+  border-radius: 10px;
+  cursor: pointer;
 }
 .ed-cancel {
   border: 1px solid var(--stroke);

@@ -13,6 +13,7 @@ import { TransformControls } from "@react-three/drei";
 import type { Vec3 } from "@/lib/knots/types";
 import { useEditorStore } from "@/lib/editor/store";
 import { RopeSolver, type SolverOpts } from "@/lib/knots/physics";
+import { interpolatePoses } from "@/lib/knots/interpolate";
 import { getRopeTextures } from "./ropeTexture";
 
 const SOLVER: SolverOpts = { gravity: 0, damping: 0.85, spring: 0.4, iterations: 6, collisionIterations: 3 };
@@ -40,6 +41,7 @@ export default function EditScene() {
   const select = useEditorStore((s) => s.select);
   const movePoint = useEditorStore((s) => s.movePoint);
   const beginChange = useEditorStore((s) => s.beginChange);
+  const preview = useEditorStore((s) => s.preview);
   const [handle, setHandle] = useState<THREE.Mesh | null>(null);
 
   const points = draft?.poses?.[activeStep] ?? [];
@@ -82,8 +84,15 @@ export default function EditScene() {
   }, [draft?.id]);
 
   useFrame((_, dt) => {
-    if (points.length < 2) return;
-    const result = solver.step([points], dt, SOLVER);
+    if (points.length < 2 || !draft?.poses) return;
+    // 미리보기 중엔 스텝 포즈를 보간해 재생, 아니면 현재 스텝 포즈.
+    const st = useEditorStore.getState();
+    let target = points;
+    if (st.preview) {
+      if (st.previewPlaying) st.tickPreview(Math.min(dt, 0.05));
+      target = interpolatePoses(draft.poses, useEditorStore.getState().previewProgress);
+    }
+    const result = solver.step([target], dt, SOLVER);
     const settled = result[0];
     if (hasB) {
       if (tubeBRef.current) tubeBRef.current.visible = true;
@@ -103,8 +112,9 @@ export default function EditScene() {
       <mesh ref={tubeARef} material={mats.A} castShadow receiveShadow />
       <mesh ref={tubeBRef} material={mats.B} castShadow receiveShadow />
 
-      {/* 제어점 마커(선택 점 제외) — 저작 좌표 */}
-      {points.map((p, i) =>
+      {/* 제어점 마커(선택 점 제외) — 저작 좌표. 미리보기 중엔 숨김. */}
+      {!preview &&
+        points.map((p, i) =>
         i === selected ? null : (
           <mesh
             key={i}
@@ -133,14 +143,14 @@ export default function EditScene() {
         )
       )}
 
-      {/* 선택된 점 = 드래그 핸들 */}
-      {selPoint && (
+      {/* 선택된 점 = 드래그 핸들. 미리보기 중엔 숨김. */}
+      {!preview && selPoint && (
         <mesh ref={setHandle} position={selPoint as THREE.Vector3Tuple} renderOrder={999}>
           <sphereGeometry args={[r * 1.9, 20, 20]} />
           <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={0.5} depthTest={false} />
         </mesh>
       )}
-      {selPoint && handle && (
+      {!preview && selPoint && handle && (
         <TransformControls
           object={handle}
           mode="translate"

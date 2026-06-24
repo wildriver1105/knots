@@ -4,7 +4,7 @@
 // 스텝 탭에서 스텝을 고르고, 3D 에서 점을 클릭→기즈모로 끌어 그 스텝의 줄 모양을 잡는다.
 // 저장 시 스텝 사이를 보간하는 애니메이션이 된다. 빌트인은 "기본값 복원" 가능.
 
-import { useEffect } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useEditorStore } from "@/lib/editor/store";
 import { usePlayerStore } from "@/lib/player/store";
 
@@ -29,6 +29,13 @@ export default function EditorPanel() {
   const save = useEditorStore((s) => s.save);
   const stop = useEditorStore((s) => s.stop);
   const resetBuiltin = useEditorStore((s) => s.resetBuiltin);
+  const preview = useEditorStore((s) => s.preview);
+  const previewPlaying = useEditorStore((s) => s.previewPlaying);
+  const previewProgress = useEditorStore((s) => s.previewProgress);
+  const togglePreview = useEditorStore((s) => s.togglePreview);
+  const playPreview = useEditorStore((s) => s.playPreview);
+  const pausePreview = useEditorStore((s) => s.pausePreview);
+  const setPreviewProgress = useEditorStore((s) => s.setPreviewProgress);
   const loadKnot = usePlayerStore((s) => s.loadKnot);
 
   // 단축키: ⌘/Ctrl+Z = undo, ⌘/Ctrl+Shift+Z 또는 Ctrl+Y = redo
@@ -54,6 +61,18 @@ export default function EditorPanel() {
   const step = draft.steps[activeStep];
   const K = draft.poses?.length ?? 0;
 
+  const [saved, setSaved] = useState(false);
+  const savedTimer = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => () => clearTimeout(savedTimer.current), []);
+
+  // 그냥 저장 — 파일에 저장하고 에디터에 그대로 머문다(중간 저장).
+  const doSave = () => {
+    save();
+    setSaved(true);
+    clearTimeout(savedTimer.current);
+    savedTimer.current = setTimeout(() => setSaved(false), 1600);
+  };
+
   const saveAndView = () => {
     const id = save();
     if (id) {
@@ -65,6 +84,43 @@ export default function EditorPanel() {
     const id = resetBuiltin();
     if (id) loadKnot(id);
   };
+
+  // 미리보기 모드: 애니메이션 재생/스크럽만.
+  if (preview) {
+    const curStep = Math.min(K - 1, Math.round(previewProgress * (K - 1)));
+    return (
+      <div className="editor-panel">
+        <div className="ed-shapehead">
+          <strong>{draft.name}</strong> · 미리보기
+        </div>
+        <div className="control-bar ed-preview-bar">
+          <div className="control-buttons">
+            <button className="ctrl-btn ctrl-btn--primary" onClick={() => (previewPlaying ? pausePreview() : playPreview())}>
+              {previewPlaying ? "❚❚" : "▶"}
+            </button>
+          </div>
+          <input
+            className="scrubber"
+            type="range"
+            min={0}
+            max={1}
+            step={0.001}
+            value={previewProgress}
+            onChange={(e) => setPreviewProgress(parseFloat(e.target.value))}
+          />
+          <div className="step-counter">
+            {curStep + 1} / {K}
+          </div>
+        </div>
+        <p className="ed-hint">스텝 포즈 사이를 보간해 재생합니다(충돌·장력 적용). 슬라이더로 구간 확인.</p>
+        <div className="ed-row ed-save">
+          <button className="ed-save-btn" onClick={togglePreview}>
+            ✎ 편집으로
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="editor-panel">
@@ -152,10 +208,16 @@ export default function EditorPanel() {
             기본값 복원
           </button>
         )}
+        <button className="ed-cancel" onClick={togglePreview} title="애니메이션 미리보기">
+          ▶ 미리보기
+        </button>
         <button className="ed-cancel" onClick={stop}>
           취소
         </button>
-        <button className="ed-save-btn" onClick={saveAndView}>
+        <button className="ed-save-ghost" onClick={doSave} title="파일에 저장(에디터 유지)">
+          {saved ? "저장됨 ✓" : "저장"}
+        </button>
+        <button className="ed-save-btn" onClick={saveAndView} title="저장하고 에디터 닫기">
           저장하고 보기
         </button>
       </div>
