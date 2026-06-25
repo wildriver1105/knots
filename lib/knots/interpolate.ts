@@ -1,9 +1,9 @@
 // 순수 유틸 — three 부작용 없음, 단위 테스트 가능.
 //
-// 애니메이션 방식: morph(형성).
-// 줄 전체가 항상 화면에 있다. 진행도(0..1)에 따라 "곧게 펴진 줄(straight baseline)"에서
-// "묶인 매듭(path)"으로 제어점을 단계적으로 이동시킨다. anchor 쪽부터 차례로 자리를 잡고,
-// 아직 형성되지 않은 부분은 곧은 채로 남아 있다가 끌려 들어온다 → 줄이 움직이며 매듭이 생긴다.
+// 애니메이션 방식: tying pose(손으로 묶는 진행).
+// 줄 전체가 항상 화면에 있다. 진행도(0..1)에 따라 working end 가 최종 path 를 따라 이동하고,
+// 이미 지나간 부분은 매듭 형태로 남으며 아직 지나가지 않은 부분은 앞쪽으로 곧게 뻗은 꼬리로 남는다.
+// 그래서 포즈 전체가 최단거리로 녹아가며 서로 통과하는 morph 느낌을 줄인다.
 
 import type { Knot, StepCamera, Vec3 } from "./types";
 
@@ -65,11 +65,46 @@ function normalize(v: Vec3): Vec3 {
   return [v[0] / m, v[1] / m, v[2] / m];
 }
 
+function add(a: Vec3, b: Vec3): Vec3 {
+  return [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+}
+
+function sub(a: Vec3, b: Vec3): Vec3 {
+  return [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+}
+
+function scale(v: Vec3, s: number): Vec3 {
+  return [v[0] * s, v[1] * s, v[2] * s];
+}
+
 /** path 의 각 점까지 누적 호 길이와 총 길이. */
 function arcLengths(points: Vec3[]): { cum: number[]; total: number } {
   const cum = [0];
   for (let i = 1; i < points.length; i++) cum.push(cum[i - 1] + dist(points[i], points[i - 1]));
   return { cum, total: cum[cum.length - 1] || 1 };
+}
+
+function pointAtArc(points: Vec3[], cum: number[], s: number): Vec3 {
+  if (points.length === 0) return [0, 0, 0];
+  if (points.length === 1 || s <= 0) return [...points[0]] as Vec3;
+  const total = cum[cum.length - 1] || 0;
+  if (s >= total) return [...points[points.length - 1]] as Vec3;
+  let i = 1;
+  while (i < cum.length && cum[i] < s) i++;
+  const a = points[i - 1];
+  const b = points[i];
+  const span = cum[i] - cum[i - 1] || 1;
+  return lerpVec3(a, b, (s - cum[i - 1]) / span);
+}
+
+function tangentAtArc(points: Vec3[], cum: number[], s: number, fallback: Vec3 = [1, 0, 0]): Vec3 {
+  if (points.length < 2) return normalize(fallback);
+  const total = cum[cum.length - 1] || 0;
+  if (s <= 0) return normalize(sub(points[1], points[0]));
+  if (s >= total) return normalize(sub(points[points.length - 1], points[points.length - 2]));
+  let i = 1;
+  while (i < cum.length && cum[i] < s) i++;
+  return normalize(sub(points[i], points[i - 1]));
 }
 
 /**
@@ -110,6 +145,45 @@ export function formStaged(from: Vec3[], to: Vec3[], progress: number, reverse =
     out[i] = lerpVec3(from[i], to[i], w);
   }
   return out;
+}
+
+/**
+ * 실제로 줄을 묶는 느낌의 진행 포즈.
+ *
+ * - reverse=false: index 0 쪽은 standing part 로 남고, working end 가 path 를 앞쪽으로 따라간다.
+ * - reverse=true: 반대 방향에서 같은 원리로 만든다.
+ *
+ * 진행 전 구간은 "다음으로 움직일 working end 꼬리"를 곧게 뻗어 표현한다. 단순 점별 보간보다
+ * 로프가 자기 자신을 뚫고 최단거리로 이동해 보이는 문제가 훨씬 적다.
+ */
+export function tieAlongPath(path: Vec3[], progress: number, reverse = false, tailDir?: Vec3): Vec3[] {
+  const N = path.length;
+  if (N < 2) return path.map((p) => [...p] as Vec3);
+  const p = Math.min(1, Math.max(0, progress));
+  if (p >= 0.9999) return path.map((q) => [...q] as Vec3);
+
+  const oriented = reverse ? [...path].reverse() : path;
+  const { cum, total } = arcLengths(oriented);
+  const front = total * p;
+  const frontPoint = pointAtArc(oriented, cum, front);
+  const preferredTail = tailDir ? normalize(tailDir) : tangentAtArc(oriented, cum, front);
+  const tangent = tangentAtArc(oriented, cum, front, preferredTail);
+  const tail = normalize(add(scale(tangent, 0.72), scale(preferredTail, 0.28)));
+  const blend = Math.max(total * 0.045, 0.001);
+
+  const out = oriented.map((original, i) => {
+    const s = cum[i];
+    if (s <= front - blend) return [...original] as Vec3;
+
+    const straight = add(frontPoint, scale(tail, s - front));
+    if (s >= front + blend) return straight;
+
+    // 움직이는 선두 근처만 살짝 섞어 꺾임을 부드럽게 한다.
+    const w = easeInOut((s - (front - blend)) / (blend * 2));
+    return lerpVec3(original, straight, w);
+  });
+
+  return reverse ? out.reverse() : out;
 }
 
 /** 살짝 넘쳤다가 제자리로 돌아오는 ease(잡아당겨 조이는 "탁" 느낌). */
@@ -174,7 +248,11 @@ export function formCenterline(path: Vec3[], straight: Vec3[], formProgress: num
  * 에디터(keyframe) 매듭: 포즈 사이를 form(0..1)으로 보간.
  * 스텝 K개를 균등 구간으로 나눠 인접 포즈를 easeInOut 으로 섞는다.
  */
-export function interpolatePoses(poses: Vec3[][], form: number): Vec3[] {
+export function interpolatePoses(
+  poses: Vec3[][],
+  form: number,
+  options: { workingStartIndex?: number; reverse?: boolean; staged?: boolean } = {}
+): Vec3[] {
   const K = poses.length;
   if (K === 0) return [];
   if (K === 1) return poses[0].map((p) => [p[0], p[1], p[2]] as Vec3);
@@ -186,7 +264,33 @@ export function interpolatePoses(poses: Vec3[][], form: number): Vec3[] {
   const b = poses[i + 1];
   const n = Math.min(a.length, b.length);
   const out: Vec3[] = new Array(n);
-  for (let j = 0; j < n; j++) out[j] = lerpVec3(a[j], b[j], f);
+  const staged = options.staged ?? true;
+  const workingStart = Math.min(n - 1, Math.max(0, options.workingStartIndex ?? Math.floor(n * 0.55)));
+  const reverse = options.reverse ?? false;
+  const blend = 0.36;
+  for (let j = 0; j < n; j++) {
+    if (!staged) {
+      out[j] = lerpVec3(a[j], b[j], f);
+      continue;
+    }
+
+    // working end 쪽이 먼저 움직이고, standing part 는 늦게 끌려온다.
+    // 에디터 포즈가 충분히 촘촘하지 않아도 "전체가 최단거리로 dissolve" 되는 느낌을 줄인다.
+    let rank: number;
+    if (!reverse) {
+      rank =
+        j >= workingStart
+          ? ((n - 1 - j) / Math.max(1, n - 1 - workingStart)) * 0.72
+          : 0.72 + (1 - j / Math.max(1, workingStart)) * 0.28;
+    } else {
+      rank =
+        j <= workingStart
+          ? (j / Math.max(1, workingStart)) * 0.72
+          : 0.72 + ((j - workingStart) / Math.max(1, n - 1 - workingStart)) * 0.28;
+    }
+    const local = easeInOut(Math.min(1, Math.max(0, (f * (1 + blend) - rank) / blend)));
+    out[j] = lerpVec3(a[j], b[j], local);
+  }
   return out;
 }
 

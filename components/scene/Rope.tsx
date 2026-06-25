@@ -12,7 +12,7 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import type { Vec3 } from "@/lib/knots/types";
 import { getKnot } from "@/lib/knots/registry";
-import { buildLoose, knotShape, sliceCurve, interpolatePoses } from "@/lib/knots/interpolate";
+import { sliceCurve, interpolatePoses, tieAlongPath } from "@/lib/knots/interpolate";
 import { RopeSolver, collidersForObject, solverOptionsForKnot } from "@/lib/knots/physics";
 import { usePlayerStore } from "@/lib/player/store";
 import { makeRopeMaterial } from "./ropeTexture";
@@ -21,8 +21,10 @@ function buildTube(points: Vec3[], radius: number): THREE.TubeGeometry | null {
   if (points.length < 2) return null;
   const v = points.map((p) => new THREE.Vector3(p[0], p[1], p[2]));
   const curve = new THREE.CatmullRomCurve3(v, false, "centripetal");
-  const seg = Math.min(700, Math.max(24, points.length * 8));
-  return new THREE.TubeGeometry(curve, seg, radius, 24, false);
+  const seg = Math.min(1200, Math.max(80, points.length * 14));
+  const geometry = new THREE.TubeGeometry(curve, seg, radius, 48, false);
+  geometry.computeVertexNormals();
+  return geometry;
 }
 
 function setGeom(mesh: THREE.Mesh | null, pts: Vec3[], radius: number) {
@@ -59,10 +61,11 @@ export default function Rope() {
   const splitFraction = hasB ? (knot.colorSplitIndex as number) / (knot.path.length - 1) : 0;
   const extras = knot.extraStrands ?? [];
 
-  // 가닥 loose/ path
+  // 가닥 path. 빌트인은 tieAlongPath 로 "working end 가 지나간 흔적"을 만들고,
+  // 커스텀은 에디터 keyframe 을 staged interpolation 으로 재생한다.
   const strands = useMemo(() => {
-    const all = [{ path: knot.path, loose: buildLoose(knot.path) }];
-    extras.forEach((e) => all.push({ path: e.path, loose: buildLoose(e.path) }));
+    const all = [{ path: knot.path, layDir: knot.layDir }];
+    extras.forEach((e) => all.push({ path: e.path, layDir: e.layDir ?? knot.layDir }));
     return all;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [knot]);
@@ -102,7 +105,9 @@ export default function Rope() {
   if (prevKnot.current !== knotId) {
     prevKnot.current = knotId;
     formRef.current = target;
-    const targets = strands.map((s) => knotShape(s.loose, s.path, target, knot.formReverse));
+    const targets = knot.poses
+      ? [interpolatePoses(knot.poses, target, { workingStartIndex: knot.colorSplitIndex, reverse: knot.formReverse })]
+      : strands.map((s) => tieAlongPath(s.path, target, knot.formReverse, s.layDir));
     const restTargets = knot.poses
       ? [knot.poses[knot.poses.length - 1] ?? knot.path]
       : strands.map((s) => s.path);
@@ -124,10 +129,11 @@ export default function Rope() {
     formRef.current = Math.abs(d) > 0.0008 ? cur + d * (1 - Math.exp(-7 * Math.min(dt, 0.05))) : target;
     const form = formRef.current;
 
-    // 커스텀(에디터) 매듭은 포즈 보간, 빌트인은 loose→tight.
+    // 커스텀(에디터) 매듭은 working-end staged keyframe 보간,
+    // 빌트인은 working end 가 최종 path 를 따라 지나가는 tying 포즈.
     const targets = knot.poses
-      ? [interpolatePoses(knot.poses, form)]
-      : strands.map((s) => knotShape(s.loose, s.path, form, knot.formReverse));
+      ? [interpolatePoses(knot.poses, form, { workingStartIndex: knot.colorSplitIndex, reverse: knot.formReverse })]
+      : strands.map((s) => tieAlongPath(s.path, form, knot.formReverse, s.layDir));
     const result = solver.step(targets, dt, solverOptionsForKnot(knot, form), colliders);
 
     // 실제 로프처럼 전체 길이를 항상 유지한다. 단계는 잘라내기(reveal)가 아니라

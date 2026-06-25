@@ -124,12 +124,15 @@ function solveDistance(pos: Vec3[], ia: number, ib: number, rest: number, stiffn
   b[2] -= dz * correction;
 }
 
-function collideRopeSegments(pos: Vec3[], segments: SegmentRef[], minDist: number): void {
+function collideRopeSegments(pos: Vec3[], segments: SegmentRef[], minDist: number, neighborSkip: number): void {
   for (let i = 0; i < segments.length; i++) {
     const a = segments[i];
     for (let j = i + 1; j < segments.length; j++) {
       const b = segments[j];
-      if (a.strand === b.strand && Math.abs(a.local - b.local) <= 3) continue;
+      // 같은 strand 의 가까운 이웃 세그먼트는 원래 연속된 한 줄이다.
+      // 샘플 간격이 로프 반지름보다 작으면 4~8칸 떨어진 이웃도 캡슐 거리상 "충돌"로 잡혀
+      // 직선 로프를 나선/물결처럼 밀어낸다. 충분히 떨어진 비인접 구간만 자기충돌 처리한다.
+      if (a.strand === b.strand && Math.abs(a.local - b.local) <= neighborSkip) continue;
       const hit = closestSegments(pos[a.a], pos[a.b], pos[b.a], pos[b.b]);
       if (hit.distance >= minDist) continue;
       let nx = hit.d[0];
@@ -226,16 +229,22 @@ export function collidersForObject(object: KnotObjectDef): CapsuleCollider[] {
 export function solverOptionsForKnot(knot: Pick<Knot, "physics">, formation = 1): SolverOpts {
   const tension = clamp01(knot.physics?.tension ?? 0.72);
   const formed = clamp01(formation);
+  const forming = easeFormation(formed);
   return {
-    gravity: knot.physics?.gravity ?? 0.55,
+    gravity: (knot.physics?.gravity ?? 0.55) * (0.35 + forming * 0.65),
     damping: knot.physics?.damping ?? 0.92,
-    spring: 0.035 + tension * 0.045,
+    spring: 0.02 + tension * (0.025 + forming * 0.035),
     iterations: 8,
-    collisionIterations: 3,
-    tension: 0.25 + tension * (0.35 + formed * 0.4),
-    bendStiffness: knot.physics?.bendStiffness ?? 0.18,
-    endpointPinning: 0.72 + tension * 0.25,
+    collisionIterations: formed < 0.035 ? 0 : formed < 0.14 ? 1 : 3,
+    tension: 0.12 + tension * (0.22 + forming * 0.55),
+    bendStiffness: (knot.physics?.bendStiffness ?? 0.18) * (0.45 + forming * 0.55),
+    endpointPinning: 0.52 + tension * (0.2 + forming * 0.25),
   };
+}
+
+function easeFormation(t: number): number {
+  const c = clamp01(t);
+  return c * c * (3 - 2 * c);
 }
 
 export class RopeSolver {
@@ -248,6 +257,7 @@ export class RopeSolver {
   private rest: number[][] = [];
   private bendRest: number[][] = [];
   private segments: SegmentRef[] = [];
+  private neighborSkips: number[] = [];
 
   constructor(radius: number) {
     this.radius = radius;
@@ -267,15 +277,18 @@ export class RopeSolver {
     this.rest = [];
     this.bendRest = [];
     this.segments = [];
+    this.neighborSkips = [];
     this.denseCounts = restTargets.map((t) => this.denseCountFor(t));
     let start = 0;
     targets.forEach((target, strand) => {
       const count = this.denseCounts[strand];
       const dense = resampleUniform(target, count);
       const restDense = resampleUniform(restTargets[strand] ?? target, count);
+      const avgRest = arcLength(restDense) / Math.max(1, count - 1);
       this.strands.push({ start, count });
       this.rest.push(restDense.slice(1).map((p, i) => dist3(restDense[i], p)));
       this.bendRest.push(restDense.slice(2).map((p, i) => dist3(restDense[i], p)));
+      this.neighborSkips.push(Math.max(6, Math.ceil((this.radius * 3.25) / Math.max(avgRest, this.radius * 0.15))));
       for (let i = 0; i < count; i++) {
         this.pos.push([...dense[i]] as Vec3);
         this.prev.push([...dense[i]] as Vec3);
@@ -344,7 +357,7 @@ export class RopeSolver {
         }
 
         if (iteration >= opts.iterations - opts.collisionIterations) {
-          collideRopeSegments(this.pos, this.segments, this.radius * 2.04);
+          collideRopeSegments(this.pos, this.segments, this.radius * 2.04, Math.max(...this.neighborSkips, 6));
           collideObjects(this.pos, colliders, this.radius);
         }
       }

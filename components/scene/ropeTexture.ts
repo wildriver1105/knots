@@ -1,11 +1,12 @@
 "use client";
 
-// 절차적 로프 텍스처 — 3가닥 꼬임 + 섬유 잔결을 노멀맵/러프니스맵으로 굽고,
-// fabric sheen(섬유 림라이트)을 더한 MeshPhysicalMaterial 를 제공한다. 클라이언트 1회 생성/공유.
+// 로프 재질 — 꼬임으로 오해되지 않는 매끈한 무광 MeshStandardMaterial 를 제공한다.
+//
+// 주의: 이전 버전의 절차적 노멀맵은 직선 로프도 "꽈배기처럼 꼬인 중심선"으로 보이게 했다.
+// 학습용 매듭에서는 실제 경로/물리 변형이 먼저 읽혀야 하므로, 런타임 재질에는 노멀맵을 걸지 않는다.
 
 import * as THREE from "three";
 
-const STRANDS = 3; // 꼬임 가닥 수
 const TILE_W = 768; // 길이 방향
 const TILE_H = 192; // 둘레 방향
 
@@ -14,18 +15,14 @@ function hash(x: number, y: number): number {
   return s - Math.floor(s);
 }
 
-// height(u,v): u=길이(0..1), v=둘레(0..1). 3가닥이 둘레로 배치되고 길이를 따라 1/STRANDS 비틀린다.
-// 깊은 가닥 골 + 가닥 위 미세 섬유 + 잔노이즈로 굵은 꼬임줄 느낌.
+// height(u,v): u=길이(0..1), v=둘레(0..1).
+// 길이 방향 섬유와 약한 둘레 불균일만 둔다. u와 v를 강하게 결합하지 않아 나선 무늬가 생기지 않는다.
 function height(u: number, v: number): number {
-  const tw = (STRANDS * v + u) * Math.PI * 2; // 비틀림 위상(이음매 seamless)
-  let lobe = Math.cos(tw) * 0.5 + 0.5; // 0..1
-  lobe = Math.pow(lobe, 0.42); // 봉우리 넓게, 골은 좁고 깊게
-  // 가닥을 따라가는 미세 섬유(고주파, 봉우리에서 강함)
-  const fiber = Math.sin(tw * 8.0) * 0.05 * (0.35 + 0.65 * lobe);
-  // 봉우리를 가로지르는 잔결(직조감)
-  const weave = Math.sin((6 * u - v) * Math.PI * 2 * STRANDS) * 0.015 * lobe;
-  const n = (hash(Math.floor(u * 320), Math.floor(v * 130)) - 0.5) * 0.045;
-  return lobe * 0.85 + fiber + weave + n;
+  const circum = Math.cos(v * Math.PI * 2 * 5) * 0.018;
+  const longFiber = Math.sin(u * Math.PI * 2 * 72 + v * 0.6) * 0.016;
+  const fineFiber = Math.sin(u * Math.PI * 2 * 173 + v * 1.7) * 0.006;
+  const n = (hash(Math.floor(u * 420), Math.floor(v * 160)) - 0.5) * 0.018;
+  return 0.5 + circum + longFiber + fineFiber + n;
 }
 
 function buildHeight(): Float32Array {
@@ -43,7 +40,7 @@ function makeNormalMap(h: Float32Array): THREE.CanvasTexture {
   const ctx = canvas.getContext("2d")!;
   const img = ctx.createImageData(TILE_W, TILE_H);
   const at = (x: number, y: number) => h[((y + TILE_H) % TILE_H) * TILE_W + ((x + TILE_W) % TILE_W)];
-  const STRENGTH = 5.5;
+  const STRENGTH = 2.2;
   for (let y = 0; y < TILE_H; y++) {
     for (let x = 0; x < TILE_W; x++) {
       const dhx = (at(x + 1, y) - at(x - 1, y)) * STRENGTH;
@@ -73,7 +70,7 @@ function makeRoughnessMap(h: Float32Array): THREE.CanvasTexture {
   for (let y = 0; y < TILE_H; y++) {
     for (let x = 0; x < TILE_W; x++) {
       const hv = h[y * TILE_W + x];
-      const rough = 0.7 + (1 - Math.min(1, Math.max(0, hv))) * 0.28; // 골 더 거칠게
+      const rough = 0.78 + (1 - Math.min(1, Math.max(0, hv))) * 0.12;
       const i = (y * TILE_W + x) * 4;
       const c = Math.max(0, Math.min(255, rough * 255));
       img.data[i] = c;
@@ -89,7 +86,7 @@ function makeRoughnessMap(h: Float32Array): THREE.CanvasTexture {
   return tex;
 }
 
-const REPEAT_LEN = 30;
+const REPEAT_LEN = 7;
 let cached: { normalMap: THREE.CanvasTexture; roughnessMap: THREE.CanvasTexture } | null = null;
 
 export function getRopeTextures() {
@@ -103,20 +100,13 @@ export function getRopeTextures() {
   return cached;
 }
 
-/** 공유 로프 재질 — 꼬임 노멀/러프 + fabric sheen. 색만 다르게 여러 개 만들어 쓴다. */
-export function makeRopeMaterial(color: string): THREE.MeshPhysicalMaterial {
-  const tex = getRopeTextures();
+/** 공유 로프 재질 — 색만 선명하게 읽히는 매끈한 무광 로프. */
+export function makeRopeMaterial(color: string): THREE.MeshStandardMaterial {
   const base = new THREE.Color(color);
-  return new THREE.MeshPhysicalMaterial({
+  return new THREE.MeshStandardMaterial({
     color: base,
     roughness: 1,
     metalness: 0,
-    roughnessMap: tex.roughnessMap,
-    normalMap: tex.normalMap,
-    normalScale: new THREE.Vector2(1.6, 1.6),
-    sheen: 0.35,
-    sheenRoughness: 0.9,
-    sheenColor: base.clone().lerp(new THREE.Color("#fff4e0"), 0.25), // 은은한 섬유 림라이트(색 유지)
-    envMapIntensity: 0.85,
+    envMapIntensity: 0.08,
   });
 }

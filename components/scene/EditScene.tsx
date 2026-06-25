@@ -1,8 +1,8 @@
 "use client";
 
 // 에디터 3D: 제어점(마커)을 클릭 선택 → 기즈모로 드래그하면 그 스텝의 포즈가 바뀐다.
-// 줄(튜브)은 뷰와 동일하게 RopeSolver(텐션+자기충돌, 중력 0)로 정착시켜 그린다 → 에디터에서도
-// 가닥이 겹치지 않는다. 마커/기즈모는 "저작 좌표"(draft)에 있고, 튜브는 충돌 해소된 결과를 보여준다.
+// 작성 중에는 저작 좌표를 그대로 그린다. solver 가 개입하면 사용자가 놓은 시작 직선도
+// 꼬인 것처럼 보일 수 있기 때문이다. 미리보기 중에만 뷰와 동일한 RopeSolver 를 적용한다.
 //
 // TransformControls 는 object prop 으로 핸들에 직접 부착(자식 래핑 시 부모 그룹만 움직이는 버그 방지).
 
@@ -20,7 +20,9 @@ function tube(points: Vec3[], radius: number): THREE.TubeGeometry | null {
   if (points.length < 2) return null;
   const v = points.map((p) => new THREE.Vector3(p[0], p[1], p[2]));
   const curve = new THREE.CatmullRomCurve3(v, false, "centripetal");
-  return new THREE.TubeGeometry(curve, Math.max(24, points.length * 8), radius, 22, false);
+  const geometry = new THREE.TubeGeometry(curve, Math.max(80, points.length * 14), radius, 48, false);
+  geometry.computeVertexNormals();
+  return geometry;
 }
 
 function setGeom(mesh: THREE.Mesh | null, pts: Vec3[], radius: number) {
@@ -61,6 +63,7 @@ export default function EditScene() {
 
   const tubeARef = useRef<THREE.Mesh>(null);
   const tubeBRef = useRef<THREE.Mesh>(null);
+  const snapKey = useRef("");
 
   useEffect(() => {
     return () => {
@@ -76,11 +79,22 @@ export default function EditScene() {
     let target = points;
     if (st.preview) {
       if (st.previewPlaying) st.tickPreview(Math.min(dt, 0.05));
-      target = interpolatePoses(draft.poses, useEditorStore.getState().previewProgress);
+      target = interpolatePoses(draft.poses, useEditorStore.getState().previewProgress, {
+        workingStartIndex: draft.colorSplitIndex,
+        reverse: draft.formReverse,
+      });
     }
     const formation = st.preview ? st.previewProgress : activeStep / Math.max(1, draft.poses.length - 1);
-    const result = solver.step([target], dt, solverOptionsForKnot(draft, formation), colliders);
-    const settled = result[0];
+
+    const key = `${draft.id}:${activeStep}:${st.preview ? "preview" : "edit"}:${points.length}`;
+    if (snapKey.current !== key) {
+      snapKey.current = key;
+      solver.snap([target], [draft.path]);
+    }
+
+    const settled = st.preview
+      ? solver.step([target], dt, solverOptionsForKnot(draft, formation), colliders)[0]
+      : target;
     const splitIdx = hasB ? Math.round(splitFraction * (settled.length - 1)) : -1;
     if (hasB && splitIdx > 0 && splitIdx < settled.length - 1) {
       if (tubeBRef.current) tubeBRef.current.visible = true;
