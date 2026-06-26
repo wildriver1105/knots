@@ -41,6 +41,7 @@ description: >-
 | `builtinRevision` | 빌트인 교정 버전. **빌트인 수정 시 반드시 +1**(저장본 마이그레이션 트리거). |
 | `path: Vec3[]` | 최종 완성형 중심선 제어점. Rope 가 CatmullRom 으로 보간. |
 | `poses?: Vec3[][]` | 스텝당 줄 전체 좌표. 길이 = `steps.length`, 각 포즈 길이 = `path.length`. 없으면 시드. |
+| `animation?: { tracks }` | 점별 키프레임(도프시트). 있으면 렌더가 poses 보다 **우선**해 시간으로 평가. 보통 코드 대신 에디터 🎞도프시트로 저작(autokey). 평가/생성 헬퍼는 `lib/knots/anim.ts`. |
 | `steps: Step[]` | `{ id, title, instruction, reveal(0..1, 마지막=1), camera? }`. |
 | `colorSplitIndex` | 이 인덱스 전 = `ropeColor`, 후 = `ropeColorB`(투톤). `ropeColorB` 쓰면 (0, path.length-1) 내부여야. |
 | `ropeColor` / `ropeColorB` | standing part / working end 색. |

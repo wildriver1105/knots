@@ -127,6 +127,8 @@ export interface Knot {
    * tracks 길이 = path.length. 에디터 도프시트로 저작/편집한다.
    */
   animation?: KnotAnimation;
+  /** 도프시트 타임라인의 전체 길이(초). 키프레임 t(0..1)를 실제 시간으로 환산·표시·스냅하는 기준. */
+  animationDuration?: number;
   /** 사용자 정의(에디터) 매듭 여부. */
   isCustom?: boolean;
 }

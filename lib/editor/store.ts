@@ -30,9 +30,11 @@ interface EditorState {
 
   // 도프시트(점별 키프레임) 모드
   dope: boolean;
-  playheadT: number; // 0..1 전역 시간
+  playheadT: number; // 0..1 전역 시간(내부는 정규화, 표시는 초/프레임)
   dopePlaying: boolean;
   onion: boolean; // 어니언 스킨(이전/다음 키 고스트)
+  durationSec: number; // 타임라인 전체 길이(초)
+  fps: number; // 프레임 스냅 그리드
 
   past: Knot[];
   future: Knot[];
@@ -60,6 +62,9 @@ interface EditorState {
   pauseDope: () => void;
   tickDope: (dt: number) => void;
   setOnion: (b: boolean) => void;
+  setDuration: (sec: number) => void;
+  setFps: (n: number) => void;
+  stepFrame: (dir: number) => void;
   addKeyHere: () => void; // 선택 점에 현재 시간 키 추가
   removeKeyHere: () => void; // 선택 점의 현재 시간 키 삭제
   moveKeyTime: (pointIndex: number, fromT: number, toT: number) => void; // 키 리타이밍
@@ -124,6 +129,13 @@ export const useEditorStore = create<EditorState>((set, get) => {
     return { activeStep: as, selected: sel };
   };
 
+  // 정규화 시간 t(0..1)을 현재 durationSec·fps 프레임 그리드에 스냅.
+  const snapToFrame = (t: number) => {
+    const { durationSec, fps } = get();
+    const frames = Math.max(1, Math.round(durationSec * fps));
+    return Math.round(Math.min(1, Math.max(0, t)) * frames) / frames;
+  };
+
   return {
     editing: false,
     draft: null,
@@ -137,6 +149,8 @@ export const useEditorStore = create<EditorState>((set, get) => {
     playheadT: 0,
     dopePlaying: false,
     onion: false,
+    durationSec: 3,
+    fps: 30,
     past: [],
     future: [],
     lastKey: null,
@@ -186,24 +200,38 @@ export const useEditorStore = create<EditorState>((set, get) => {
       const on = !get().dope;
       if (on) {
         const d = ensureAnimation(clone(get().draft!));
-        set({ dope: true, draft: d, playheadT: 0, dopePlaying: false, preview: false, previewPlaying: false });
+        const dur = d.animationDuration ?? Math.max(1, (Math.max(2, d.steps.length) - 1) * (d.defaultStepDuration || 1));
+        set({ dope: true, draft: d, playheadT: 0, dopePlaying: false, preview: false, previewPlaying: false, durationSec: dur });
       } else {
         set({ dope: false, dopePlaying: false });
       }
     },
-    setPlayhead: (t) => set({ playheadT: Math.min(1, Math.max(0, t)), dopePlaying: false }),
+    setPlayhead: (t) => set({ playheadT: snapToFrame(t), dopePlaying: false }),
     playDope: () => set((s) => ({ dopePlaying: true, playheadT: s.playheadT >= 1 ? 0 : s.playheadT })),
-    pauseDope: () => set({ dopePlaying: false }),
+    pauseDope: () => set((s) => ({ dopePlaying: false, playheadT: snapToFrame(s.playheadT) })),
     tickDope: (dt) => {
       const s = get();
       if (!s.dopePlaying || !s.draft) return;
-      const K = Math.max(2, s.draft.steps.length);
-      const total = Math.max(0.6, (K - 1) * (s.draft.defaultStepDuration || 1));
+      // 실시간(초): durationSec 동안 0→1 재생.
+      const total = Math.max(0.2, s.durationSec);
       const np = s.playheadT + dt / total;
       if (np >= 1) set({ playheadT: 1, dopePlaying: false });
       else set({ playheadT: np });
     },
     setOnion: (b) => set({ onion: b }),
+    setDuration: (sec) => {
+      const v = Math.max(0.2, sec);
+      snapshot("dur");
+      const d = get().draft;
+      set({ durationSec: v, draft: d ? { ...d, animationDuration: v } : d });
+    },
+    setFps: (n) => set({ fps: Math.min(120, Math.max(1, Math.round(n))) }),
+    stepFrame: (dir) => {
+      const { durationSec, fps, playheadT } = get();
+      const frames = Math.max(1, Math.round(durationSec * fps));
+      const f = Math.min(frames, Math.max(0, Math.round(playheadT * frames) + dir));
+      set({ playheadT: f / frames, dopePlaying: false });
+    },
     addKeyHere: () => {
       const { draft, selected, playheadT } = get();
       if (!draft?.animation || selected == null) return;
@@ -230,7 +258,7 @@ export const useEditorStore = create<EditorState>((set, get) => {
       const idx = tr.keys.findIndex((k) => Math.abs(k.t - fromT) <= 1e-3);
       if (idx < 0) return;
       const pos = tr.keys[idx].pos;
-      const nt = Math.min(1, Math.max(0, toT));
+      const nt = snapToFrame(toT);
       tracks[pointIndex] = tr.keys.length === 1 ? { keys: [{ t: nt, pos }] } : upsertKey(removeKeyAt(tr, fromT), nt, pos);
       set({ draft: { ...draft, animation: { tracks } }, playheadT: nt });
     },

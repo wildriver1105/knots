@@ -259,6 +259,9 @@ export default function EditorPanel() {
         <button className="ed-cancel" onClick={togglePreview} title="애니메이션 미리보기">
           ▶ 미리보기
         </button>
+        <button className="ed-cancel" onClick={toggleDope} title="점별 키프레임 타임라인 편집">
+          🎞 도프시트
+        </button>
         <button className="ed-cancel" onClick={stop}>
           취소
         </button>
