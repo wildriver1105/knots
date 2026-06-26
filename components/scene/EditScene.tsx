@@ -16,11 +16,31 @@ import { RopeSolver, collidersForObject, solverOptionsForKnot } from "@/lib/knot
 import { interpolatePoses } from "@/lib/knots/interpolate";
 import { makeRopeMaterial } from "./ropeTexture";
 
+function smoothCenterline(points: Vec3[], passes: number, factor: number): Vec3[] {
+  let out = points.map((p) => [p[0], p[1], p[2]] as Vec3);
+  for (let pass = 0; pass < passes; pass++) {
+    const next = out.map((p) => [p[0], p[1], p[2]] as Vec3);
+    for (let i = 1; i < out.length - 1; i++) {
+      next[i][0] = out[i][0] * (1 - factor) + (out[i - 1][0] + out[i + 1][0]) * 0.5 * factor;
+      next[i][1] = out[i][1] * (1 - factor) + (out[i - 1][1] + out[i + 1][1]) * 0.5 * factor;
+      next[i][2] = out[i][2] * (1 - factor) + (out[i - 1][2] + out[i + 1][2]) * 0.5 * factor;
+    }
+    out = next;
+  }
+  return out;
+}
+
 function tube(points: Vec3[], radius: number): THREE.TubeGeometry | null {
-  if (points.length < 2) return null;
-  const v = points.map((p) => new THREE.Vector3(p[0], p[1], p[2]));
+  const smooth = smoothCenterline(points, 3, 0.5);
+  const clean: Vec3[] = [];
+  for (const p of smooth) {
+    const last = clean[clean.length - 1];
+    if (!last || Math.hypot(p[0] - last[0], p[1] - last[1], p[2] - last[2]) > radius * 0.2) clean.push(p);
+  }
+  if (clean.length < 2) return null;
+  const v = clean.map((p) => new THREE.Vector3(p[0], p[1], p[2]));
   const curve = new THREE.CatmullRomCurve3(v, false, "centripetal");
-  const geometry = new THREE.TubeGeometry(curve, Math.max(80, points.length * 14), radius, 48, false);
+  const geometry = new THREE.TubeGeometry(curve, Math.min(600, Math.max(64, clean.length * 5)), radius, 28, false);
   geometry.computeVertexNormals();
   return geometry;
 }

@@ -12,17 +12,43 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import type { Vec3 } from "@/lib/knots/types";
 import { getKnot } from "@/lib/knots/registry";
-import { sliceCurve, interpolatePoses, tieAlongPath } from "@/lib/knots/interpolate";
+import { sliceCurve, interpolatePoses, knotShape, buildLoose } from "@/lib/knots/interpolate";
 import { RopeSolver, collidersForObject, solverOptionsForKnot } from "@/lib/knots/physics";
 import { usePlayerStore } from "@/lib/player/store";
 import { makeRopeMaterial } from "./ropeTexture";
 
+// 중심선 라플라시안 스무딩 — 자기충돌이 만든 고주파 지그재그(구슬/꽈배기)를 펴서
+// 줄이 매끈하게 보이게 한다. 끝점은 고정.
+function smoothCenterline(points: Vec3[], passes: number, factor: number): Vec3[] {
+  let out = points.map((p) => [p[0], p[1], p[2]] as Vec3);
+  for (let pass = 0; pass < passes; pass++) {
+    const next = out.map((p) => [p[0], p[1], p[2]] as Vec3);
+    for (let i = 1; i < out.length - 1; i++) {
+      const avgX = (out[i - 1][0] + out[i + 1][0]) * 0.5;
+      const avgY = (out[i - 1][1] + out[i + 1][1]) * 0.5;
+      const avgZ = (out[i - 1][2] + out[i + 1][2]) * 0.5;
+      next[i][0] = out[i][0] * (1 - factor) + avgX * factor;
+      next[i][1] = out[i][1] * (1 - factor) + avgY * factor;
+      next[i][2] = out[i][2] * (1 - factor) + avgZ * factor;
+    }
+    out = next;
+  }
+  return out;
+}
+
 function buildTube(points: Vec3[], radius: number): THREE.TubeGeometry | null {
-  if (points.length < 2) return null;
-  const v = points.map((p) => new THREE.Vector3(p[0], p[1], p[2]));
+  // 충돌로 생긴 울퉁불퉁함을 펴고, 겹친(0길이) 점 제거(centripetal CatmullRom NaN 방지).
+  const smooth = smoothCenterline(points, 3, 0.5);
+  const clean: Vec3[] = [];
+  for (const p of smooth) {
+    const last = clean[clean.length - 1];
+    if (!last || Math.hypot(p[0] - last[0], p[1] - last[1], p[2] - last[2]) > radius * 0.2) clean.push(p);
+  }
+  if (clean.length < 2) return null;
+  const v = clean.map((p) => new THREE.Vector3(p[0], p[1], p[2]));
   const curve = new THREE.CatmullRomCurve3(v, false, "centripetal");
-  const seg = Math.min(1200, Math.max(80, points.length * 14));
-  const geometry = new THREE.TubeGeometry(curve, seg, radius, 48, false);
+  const seg = Math.min(600, Math.max(64, clean.length * 5));
+  const geometry = new THREE.TubeGeometry(curve, seg, radius, 28, false);
   geometry.computeVertexNormals();
   return geometry;
 }
@@ -64,8 +90,8 @@ export default function Rope() {
   // 가닥 path. 빌트인은 tieAlongPath 로 "working end 가 지나간 흔적"을 만들고,
   // 커스텀은 에디터 keyframe 을 staged interpolation 으로 재생한다.
   const strands = useMemo(() => {
-    const all = [{ path: knot.path, layDir: knot.layDir }];
-    extras.forEach((e) => all.push({ path: e.path, layDir: e.layDir ?? knot.layDir }));
+    const all = [{ path: knot.path, loose: buildLoose(knot.path) }];
+    extras.forEach((e) => all.push({ path: e.path, loose: buildLoose(e.path) }));
     return all;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [knot]);
@@ -107,7 +133,7 @@ export default function Rope() {
     formRef.current = target;
     const targets = knot.poses
       ? [interpolatePoses(knot.poses, target, { workingStartIndex: knot.colorSplitIndex, reverse: knot.formReverse })]
-      : strands.map((s) => tieAlongPath(s.path, target, knot.formReverse, s.layDir));
+      : strands.map((s) => knotShape(s.loose, s.path, target, knot.formReverse));
     const restTargets = knot.poses
       ? [knot.poses[knot.poses.length - 1] ?? knot.path]
       : strands.map((s) => s.path);
@@ -133,7 +159,7 @@ export default function Rope() {
     // 빌트인은 working end 가 최종 path 를 따라 지나가는 tying 포즈.
     const targets = knot.poses
       ? [interpolatePoses(knot.poses, form, { workingStartIndex: knot.colorSplitIndex, reverse: knot.formReverse })]
-      : strands.map((s) => tieAlongPath(s.path, form, knot.formReverse, s.layDir));
+      : strands.map((s) => knotShape(s.loose, s.path, form, knot.formReverse));
     const result = solver.step(targets, dt, solverOptionsForKnot(knot, form), colliders);
 
     // 실제 로프처럼 전체 길이를 항상 유지한다. 단계는 잘라내기(reveal)가 아니라

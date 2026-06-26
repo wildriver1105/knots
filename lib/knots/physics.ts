@@ -231,14 +231,18 @@ export function solverOptionsForKnot(knot: Pick<Knot, "physics">, formation = 1)
   const formed = clamp01(formation);
   const forming = easeFormation(formed);
   return {
-    gravity: (knot.physics?.gravity ?? 0.55) * (0.35 + forming * 0.65),
-    damping: knot.physics?.damping ?? 0.92,
-    spring: 0.02 + tension * (0.025 + forming * 0.035),
+    // 매듭은 공중에 떠 있다 — 중력은 매듭을 아래로 풀어헤치므로 0(physics.gravity 로만 의도적 사용).
+    gravity: knot.physics?.gravity ?? 0,
+    // damping 을 낮춰 제약 보정에서 생긴 가짜 속도를 흩어 발산(폭발)을 막는다.
+    damping: knot.physics?.damping ?? 0.55,
+    // 내부 가이드를 적당히 강하게: 목표(loose→tight)를 따라가 매듭이 풀리지 않게.
+    // 너무 세면(>0.3) verlet 속도가 누적돼 폭발하므로 중간값.
+    spring: 0.08 + forming * 0.12,
     iterations: 8,
-    collisionIterations: formed < 0.035 ? 0 : formed < 0.14 ? 1 : 3,
-    tension: 0.12 + tension * (0.22 + forming * 0.55),
-    bendStiffness: (knot.physics?.bendStiffness ?? 0.18) * (0.45 + forming * 0.55),
-    endpointPinning: 0.52 + tension * (0.2 + forming * 0.25),
+    collisionIterations: formed < 0.05 ? 0 : 2,
+    tension: 0.35 + tension * 0.45,
+    bendStiffness: (knot.physics?.bendStiffness ?? 0.12) * (0.5 + forming * 0.5),
+    endpointPinning: 0.45 + tension * 0.2,
   };
 }
 
@@ -288,7 +292,9 @@ export class RopeSolver {
       this.strands.push({ start, count });
       this.rest.push(restDense.slice(1).map((p, i) => dist3(restDense[i], p)));
       this.bendRest.push(restDense.slice(2).map((p, i) => dist3(restDense[i], p)));
-      this.neighborSkips.push(Math.max(6, Math.ceil((this.radius * 3.25) / Math.max(avgRest, this.radius * 0.15))));
+      // 굽은 구간에서 같은 줄의 가까운 점들이 서로 "충돌"로 잡혀 줄이 꽈배기처럼 울퉁불퉁해진다.
+      // 인접 점을 더 넓게 건너뛴다(진짜 가닥 교차는 인덱스상 훨씬 멀리 떨어져 있음).
+      this.neighborSkips.push(Math.max(12, Math.ceil((this.radius * 6) / Math.max(avgRest, this.radius * 0.15))));
       for (let i = 0; i < count; i++) {
         this.pos.push([...dense[i]] as Vec3);
         this.prev.push([...dense[i]] as Vec3);
@@ -357,8 +363,30 @@ export class RopeSolver {
         }
 
         if (iteration >= opts.iterations - opts.collisionIterations) {
-          collideRopeSegments(this.pos, this.segments, this.radius * 2.04, Math.max(...this.neighborSkips, 6));
+          collideRopeSegments(this.pos, this.segments, this.radius * 2.0, Math.max(...this.neighborSkips, 6));
           collideObjects(this.pos, colliders, this.radius);
+        }
+      }
+
+      // 폭발 방지: 점이 목표에서 너무 멀어지면 끌어당겨 안정화한다(충돌이 밀어낼 여유는 남김).
+      // 꽉 조인 매듭의 교차에서 자기충돌이 진동·발산해 화면 밖으로 날아가는 것을 막는다.
+      const maxDev = this.radius * 7;
+      for (let i = 0; i < this.pos.length; i++) {
+        const dx = this.pos[i][0] - flatTarget[i][0];
+        const dy = this.pos[i][1] - flatTarget[i][1];
+        const dz = this.pos[i][2] - flatTarget[i][2];
+        const dlen = Math.hypot(dx, dy, dz);
+        // 충돌이 만든 NaN(겹친 점 → 0길이 세그먼트)도 여기서 목표로 리셋해야 한다.
+        // (NaN > maxDev 는 false 라 그냥 두면 NaN 이 렌더로 새어 화면이 빈다.)
+        if (!Number.isFinite(dlen)) {
+          this.pos[i] = [...flatTarget[i]] as Vec3;
+          this.prev[i] = [...flatTarget[i]] as Vec3;
+        } else if (dlen > maxDev) {
+          const s = maxDev / dlen;
+          this.pos[i][0] = flatTarget[i][0] + dx * s;
+          this.pos[i][1] = flatTarget[i][1] + dy * s;
+          this.pos[i][2] = flatTarget[i][2] + dz * s;
+          this.prev[i] = [...this.pos[i]] as Vec3; // 속도 리셋(발산 방지)
         }
       }
     }
