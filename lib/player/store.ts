@@ -23,6 +23,11 @@ export interface PlayerState {
   progress: number; // 0..1
   playbackRate: number;
 
+  // 제어점 디버그 오버레이(저작/검증용). 스토어에 둬서 eval 로도 토글 가능.
+  debugPoints: boolean;
+  setDebugPoints: (on: boolean) => void;
+  toggleDebugPoints: () => void;
+
   // ── 커맨드 API (입력원 공통) ──
   loadKnot: (id: string) => void;
   setMode: (m: PlayMode) => void;
@@ -50,6 +55,10 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   isPlaying: false,
   progress: 0,
   playbackRate: 1,
+  debugPoints: false,
+
+  setDebugPoints: (on) => set({ debugPoints: on }),
+  toggleDebugPoints: () => set((s) => ({ debugPoints: !s.debugPoints })),
 
   loadKnot: (id) =>
     set({ knotId: id, stepIndex: 0, progress: 0, isPlaying: false }),

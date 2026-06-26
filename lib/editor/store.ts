@@ -8,7 +8,8 @@
 import { create } from "zustand";
 import type { Knot, Vec3 } from "@/lib/knots/types";
 import { newCustomKnot, syncCustomKnot } from "@/lib/knots/custom";
-import { buildStraightBaseline, formStaged } from "@/lib/knots/interpolate";
+import { seedPoses } from "@/lib/knots/authoring";
+import { animationFromPoses, sampleTrack, upsertKey, removeKeyAt, finalPoseOfAnimation } from "@/lib/knots/anim";
 import { collidersForObject, relaxPoints } from "@/lib/knots/physics";
 import { BUILTIN_IDS } from "@/lib/knots/data";
 import { useKnotsRepo } from "@/lib/knots/repo";
@@ -26,6 +27,12 @@ interface EditorState {
   preview: boolean;
   previewPlaying: boolean;
   previewProgress: number;
+
+  // 도프시트(점별 키프레임) 모드
+  dope: boolean;
+  playheadT: number; // 0..1 전역 시간
+  dopePlaying: boolean;
+  onion: boolean; // 어니언 스킨(이전/다음 키 고스트)
 
   past: Knot[];
   future: Knot[];
@@ -46,6 +53,17 @@ interface EditorState {
   setPreviewProgress: (p: number) => void;
   tickPreview: (dt: number) => void;
 
+  // 도프시트
+  toggleDope: () => void;
+  setPlayhead: (t: number) => void;
+  playDope: () => void;
+  pauseDope: () => void;
+  tickDope: (dt: number) => void;
+  setOnion: (b: boolean) => void;
+  addKeyHere: () => void; // 선택 점에 현재 시간 키 추가
+  removeKeyHere: () => void; // 선택 점의 현재 시간 키 삭제
+  moveKeyTime: (pointIndex: number, fromT: number, toT: number) => void; // 키 리타이밍
+
   setActiveStep: (i: number) => void;
   select: (i: number | null) => void;
   movePoint: (i: number, pos: Vec3) => void;
@@ -65,15 +83,20 @@ function clone(k: Knot): Knot {
   return JSON.parse(JSON.stringify(k));
 }
 
+// 도프시트 진입 시 점별 트랙을 보장한다(없으면 poses 의 각 스텝 시각에 키를 박아 시드).
+function ensureAnimation(d: Knot): Knot {
+  if (d.animation && d.animation.tracks.length === d.path.length) return d;
+  const poses = d.poses && d.poses.length >= 2 ? d.poses : seedPoses(d.path, Math.max(2, d.steps.length), { layDir: d.layDir, layCenter: d.layCenter, formReverse: d.formReverse });
+  const K = poses.length;
+  const times = poses.map((_, i) => (K > 1 ? i / (K - 1) : 1));
+  d.animation = animationFromPoses(poses, times);
+  return d;
+}
+
 function ensurePoses(d: Knot): Knot {
   if (d.poses && d.poses.length >= 2) return d;
-  const straight = buildStraightBaseline(d.path, d.layDir, d.layCenter, 0.7);
   const K = Math.max(2, d.steps.length);
-  const poses: Vec3[][] = [];
-  for (let i = 0; i < K; i++) {
-    poses.push(formStaged(straight, d.path, K > 1 ? i / (K - 1) : 1, d.formReverse));
-  }
-  d.poses = poses;
+  d.poses = seedPoses(d.path, K, { layDir: d.layDir, layCenter: d.layCenter, formReverse: d.formReverse });
   while (d.steps.length < K) {
     d.steps.push({ id: "s" + d.steps.length, title: "스텝 " + (d.steps.length + 1), instruction: "", reveal: 1 });
   }
@@ -110,6 +133,10 @@ export const useEditorStore = create<EditorState>((set, get) => {
     preview: false,
     previewPlaying: false,
     previewProgress: 0,
+    dope: false,
+    playheadT: 0,
+    dopePlaying: false,
+    onion: false,
     past: [],
     future: [],
     lastKey: null,
@@ -127,7 +154,7 @@ export const useEditorStore = create<EditorState>((set, get) => {
       set({ editing: true, draft: d, isBuiltin, activeStep: 0, selected: mid, past: [], future: [], lastKey: null, preview: false, previewPlaying: false, previewProgress: 0 });
     },
 
-    stop: () => set({ editing: false, draft: null, selected: null, past: [], future: [], lastKey: null, preview: false, previewPlaying: false }),
+    stop: () => set({ editing: false, draft: null, selected: null, past: [], future: [], lastKey: null, preview: false, previewPlaying: false, dope: false, dopePlaying: false, playheadT: 0 }),
 
     resetBuiltin: () => {
       const d = get().draft;
@@ -152,6 +179,60 @@ export const useEditorStore = create<EditorState>((set, get) => {
       const np = s.previewProgress + dt / total;
       if (np >= 1) set({ previewProgress: 1, previewPlaying: false });
       else set({ previewProgress: np });
+    },
+
+    // ── 도프시트 ──
+    toggleDope: () => {
+      const on = !get().dope;
+      if (on) {
+        const d = ensureAnimation(clone(get().draft!));
+        set({ dope: true, draft: d, playheadT: 0, dopePlaying: false, preview: false, previewPlaying: false });
+      } else {
+        set({ dope: false, dopePlaying: false });
+      }
+    },
+    setPlayhead: (t) => set({ playheadT: Math.min(1, Math.max(0, t)), dopePlaying: false }),
+    playDope: () => set((s) => ({ dopePlaying: true, playheadT: s.playheadT >= 1 ? 0 : s.playheadT })),
+    pauseDope: () => set({ dopePlaying: false }),
+    tickDope: (dt) => {
+      const s = get();
+      if (!s.dopePlaying || !s.draft) return;
+      const K = Math.max(2, s.draft.steps.length);
+      const total = Math.max(0.6, (K - 1) * (s.draft.defaultStepDuration || 1));
+      const np = s.playheadT + dt / total;
+      if (np >= 1) set({ playheadT: 1, dopePlaying: false });
+      else set({ playheadT: np });
+    },
+    setOnion: (b) => set({ onion: b }),
+    addKeyHere: () => {
+      const { draft, selected, playheadT } = get();
+      if (!draft?.animation || selected == null) return;
+      snapshot();
+      const tracks = draft.animation.tracks.map((t) => ({ keys: t.keys.map((k) => ({ t: k.t, pos: [...k.pos] as Vec3 })) }));
+      const cur = sampleTrack(tracks[selected], playheadT);
+      tracks[selected] = upsertKey(tracks[selected], playheadT, cur);
+      set({ draft: { ...draft, animation: { tracks } } });
+    },
+    removeKeyHere: () => {
+      const { draft, selected, playheadT } = get();
+      if (!draft?.animation || selected == null) return;
+      snapshot();
+      const tracks = draft.animation.tracks.map((t) => ({ keys: t.keys.map((k) => ({ t: k.t, pos: [...k.pos] as Vec3 })) }));
+      tracks[selected] = removeKeyAt(tracks[selected], playheadT);
+      set({ draft: { ...draft, animation: { tracks } } });
+    },
+    moveKeyTime: (pointIndex, fromT, toT) => {
+      const { draft } = get();
+      if (!draft?.animation) return;
+      snapshot("retime:" + pointIndex + ":" + fromT.toFixed(3));
+      const tracks = draft.animation.tracks.map((t) => ({ keys: t.keys.map((k) => ({ t: k.t, pos: [...k.pos] as Vec3 })) }));
+      const tr = tracks[pointIndex];
+      const idx = tr.keys.findIndex((k) => Math.abs(k.t - fromT) <= 1e-3);
+      if (idx < 0) return;
+      const pos = tr.keys[idx].pos;
+      const nt = Math.min(1, Math.max(0, toT));
+      tracks[pointIndex] = tr.keys.length === 1 ? { keys: [{ t: nt, pos }] } : upsertKey(removeKeyAt(tr, fromT), nt, pos);
+      set({ draft: { ...draft, animation: { tracks } }, playheadT: nt });
     },
 
     beginChange: () => snapshot(),
@@ -181,7 +262,16 @@ export const useEditorStore = create<EditorState>((set, get) => {
 
     movePoint: (i, pos) => {
       const d = get().draft;
-      if (!d?.poses) return;
+      if (!d) return;
+      // 도프시트 모드: 드래그 = autokey(선택 점의 현재 시간 키를 갱신/추가).
+      if (get().dope && d.animation) {
+        const t = get().playheadT;
+        const tracks = d.animation.tracks.map((tr) => ({ keys: tr.keys.map((k) => ({ t: k.t, pos: [...k.pos] as Vec3 })) }));
+        tracks[i] = upsertKey(tracks[i], t, pos);
+        set({ draft: { ...d, animation: { tracks } } });
+        return;
+      }
+      if (!d.poses) return;
       const poses = d.poses.map((p) => p.map((q) => [...q] as Vec3));
       poses[get().activeStep][i] = pos;
       set({ draft: { ...d, poses } });
@@ -269,7 +359,8 @@ export const useEditorStore = create<EditorState>((set, get) => {
     save: () => {
       const d = get().draft;
       if (!d) return null;
-      const synced = syncCustomKnot(d);
+      // 도프시트가 있으면 path 를 최종(t=1) 포즈로 동기화(색경계/카메라용), 아니면 기존 스텝 동기화.
+      const synced = d.animation ? { ...d, path: finalPoseOfAnimation(d.animation) } : syncCustomKnot(d);
       void useKnotsRepo.getState().upsert(synced);
       set({ draft: synced });
       return synced.id;

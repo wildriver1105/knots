@@ -4,6 +4,7 @@
 
 import type { Knot, Vec3 } from "../types";
 import { helixY, line, join } from "../builder";
+import { tiePoses } from "../authoring";
 
 const RP = 0.5; // 말뚝 반경
 const RR = RP + 0.085; // 로프 중심선 감김 반경
@@ -30,7 +31,7 @@ const path: Vec3[] = join(tailIn, turn1, cross, turn2, tuck, tailOut);
 
 export const cloveHitch: Knot = {
   id: "clove-hitch",
-  builtinRevision: 3,
+  builtinRevision: 5,
   name: "Clove Hitch",
   blurb: "말뚝·레일에 빠르게 매고 푸는 히치. 페인더/펜더를 임시로 고정할 때 흔히 쓴다.",
   difficulty: 1,
@@ -44,10 +45,12 @@ export const cloveHitch: Knot = {
   layDir: [1, 0, 0],
   layCenter: [0, -0.1, 1.0],
   defaultStepDuration: 1.4,
+  // 감은 부분은 말뚝 위 제자리, 아직 안 감은 working end 는 곧게 — "줄을 따라 꿰는" 진행 포즈.
+  poses: tiePoses(path, [0.38, 0.55, 0.82, 1], { reverse: false, tailDir: [0.3, -0.1, 1] }),
   steps: [
-    { id: "approach", title: "First wrap", instruction: "working end 를 말뚝 뒤로 한 바퀴 감는다.", reveal: 0.38 },
-    { id: "cross", title: "Cross diagonally", instruction: "끝을 앞면에서 대각선으로 교차시켜 위로 올린다.", reveal: 0.55 },
-    { id: "second", title: "Second wrap", instruction: "한 바퀴 더 감아 첫 바퀴 위에 X 모양을 만든다.", reveal: 0.82 },
-    { id: "tuck", title: "Tuck under", instruction: "끝을 방금 만든 대각선 아래로 끼워 넣고 당겨 조인다.", reveal: 1 },
+    { id: "approach", title: "First wrap", instruction: "working end 를 말뚝 뒤로 한 바퀴 감는다.", reveal: 0.38, camera: { position: [1.5, 0.3, 4.2], target: [0, -0.1, 0.35] } },
+    { id: "cross", title: "Cross diagonally", instruction: "끝을 앞면에서 대각선으로 교차시켜 위로 올린다.", reveal: 0.55, camera: { position: [1.5, 0.3, 4.2], target: [0, -0.05, 0.35] } },
+    { id: "second", title: "Second wrap", instruction: "한 바퀴 더 감아 첫 바퀴 위에 X 모양을 만든다.", reveal: 0.82, camera: { position: [1.4, 0.35, 4.0], target: [0, 0.0, 0.35] } },
+    { id: "tuck", title: "Tuck under", instruction: "끝을 방금 만든 대각선 아래로 끼워 넣고 당겨 조인다.", reveal: 1, camera: { position: [1.3, 0.3, 3.9], target: [0, -0.05, 0.35] } },
   ],
 };

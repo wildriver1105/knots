@@ -91,6 +91,15 @@ body {
   scrollbar-width: thin;
 }
 
+/* 무대 + (오버레이) 컨트롤 바를 묶는 열. 오버레이의 위치 기준(position:relative). */
+.stagecol {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .stage {
   position: relative;
   flex: 1 1 auto;
@@ -674,10 +683,27 @@ body {
     flex-direction: column;
     gap: 10px;
   }
+  /* 좁은 화면: stagecol 을 펼쳐(children 이 .main 컬럼에 직접 흐르게) 무대+컨트롤 바를 분리 배치. */
+  .stagecol {
+    display: contents;
+  }
   .stage {
-    order: 1;
     flex: 1 1 auto;
-    min-height: 44vh;
+    min-height: 52vh;
+  }
+  /* 좁은 화면: 컨트롤 바를 무대 위 오버레이 대신 무대 아래 일반 흐름으로 — 매듭을 가리지 않게. */
+  .overlay--bottom {
+    position: static;
+    transform: none;
+    left: auto;
+    bottom: auto;
+    width: 100%;
+    margin-top: 8px;
+    display: flex;
+    justify-content: center;
+  }
+  .overlay--bottom .control-bar {
+    width: min(760px, 100%);
   }
   .rail {
     order: 2;

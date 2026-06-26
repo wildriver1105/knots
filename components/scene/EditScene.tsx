@@ -12,7 +12,7 @@ import * as THREE from "three";
 import { TransformControls } from "@react-three/drei";
 import type { Vec3 } from "@/lib/knots/types";
 import { useEditorStore } from "@/lib/editor/store";
-import { RopeSolver, collidersForObject, solverOptionsForKnot } from "@/lib/knots/physics";
+import { collidersForObject, relaxPoints } from "@/lib/knots/physics";
 import { interpolatePoses } from "@/lib/knots/interpolate";
 import { makeRopeMaterial } from "./ropeTexture";
 
@@ -68,10 +68,7 @@ export default function EditScene() {
   const r = draft?.ropeRadius ?? 0.075;
   const split = draft?.colorSplitIndex ?? -1;
   const hasB = split > 0 && !!draft?.ropeColorB && split < points.length - 1;
-  // solver dense 출력 → 색 경계는 호 비율로.
-  const splitFraction = hasB && points.length > 1 ? split / (points.length - 1) : 0;
 
-  const solver = useMemo(() => new RopeSolver(r), [draft?.id, r, points.length]);
   const colliders = useMemo(() => collidersForObject(draft?.object ?? { kind: "none" }), [draft?.object]);
   const mats = useMemo(
     () => ({
@@ -83,7 +80,6 @@ export default function EditScene() {
 
   const tubeARef = useRef<THREE.Mesh>(null);
   const tubeBRef = useRef<THREE.Mesh>(null);
-  const snapKey = useRef("");
 
   useEffect(() => {
     return () => {
@@ -97,26 +93,24 @@ export default function EditScene() {
     // 미리보기 중엔 스텝 포즈를 보간해 재생, 아니면 현재 스텝 포즈.
     const st = useEditorStore.getState();
     let target = points;
+    let formation = activeStep / Math.max(1, draft.poses.length - 1);
     if (st.preview) {
       if (st.previewPlaying) st.tickPreview(Math.min(dt, 0.05));
-      target = interpolatePoses(draft.poses, useEditorStore.getState().previewProgress, {
+      const pp = useEditorStore.getState().previewProgress;
+      target = interpolatePoses(draft.poses, pp, {
         workingStartIndex: draft.colorSplitIndex,
         reverse: draft.formReverse,
       });
-    }
-    const formation = st.preview ? st.previewProgress : activeStep / Math.max(1, draft.poses.length - 1);
-
-    const key = `${draft.id}:${activeStep}:${st.preview ? "preview" : "edit"}:${points.length}`;
-    if (snapKey.current !== key) {
-      snapKey.current = key;
-      solver.snap([target], [draft.path]);
+      formation = pp;
     }
 
-    const settled = st.preview
-      ? solver.step([target], dt, solverOptionsForKnot(draft, formation), colliders)[0]
-      : target;
-    const splitIdx = hasB ? Math.round(splitFraction * (settled.length - 1)) : -1;
-    if (hasB && splitIdx > 0 && splitIdx < settled.length - 1) {
+    // 뷰 런타임과 동일: 기본은 저작 포즈 그대로. settle="light" 일 때만 거의 완성 포즈를 약하게 정리.
+    const settleMode = draft.physics?.settle ?? "off";
+    const settled =
+      st.preview && settleMode === "light" && formation > 0.9 ? relaxPoints(target, r, 16, colliders) : target;
+
+    const splitIdx = hasB ? Math.min(settled.length - 2, Math.max(1, split)) : -1;
+    if (hasB && splitIdx > 0) {
       if (tubeBRef.current) tubeBRef.current.visible = true;
       setGeom(tubeARef.current, settled.slice(0, splitIdx + 1), r);
       setGeom(tubeBRef.current, settled.slice(splitIdx), r);

@@ -14,10 +14,12 @@ import CameraRig from "./CameraRig";
 import PlaybackTicker from "./PlaybackTicker";
 import DebugPoints from "./DebugPoints";
 import EditScene from "./EditScene";
+import DopeScene from "./DopeScene";
 import { useEditorStore } from "@/lib/editor/store";
 
 export default function SceneCanvas({ showDebug = false }: { showDebug?: boolean }) {
   const editing = useEditorStore((s) => s.editing);
+  const dope = useEditorStore((s) => s.dope);
   const draftObject = useEditorStore((s) => s.draft?.object);
   return (
     <Canvas
@@ -32,7 +34,7 @@ export default function SceneCanvas({ showDebug = false }: { showDebug?: boolean
           {editing ? (
             <>
               {draftObject && <KnotObject object={draftObject} />}
-              <EditScene />
+              {dope ? <DopeScene /> : <EditScene />}
             </>
           ) : (
             <>

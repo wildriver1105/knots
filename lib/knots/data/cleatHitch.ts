@@ -3,6 +3,7 @@
 // 클리트는 x축 가로 배치(뿔 x=±0.78). 윗면 교차(X)는 z 깊이로 분리한다.
 
 import type { Knot, Vec3 } from "../types";
+import { tiePoses } from "../authoring";
 
 // 제어점을 직접 배치(CatmullRom 이 매끄럽게 보간). 윗면을 지나는 대각선은 z 를 벌려 X 가 또렷하게.
 const path: Vec3[] = [
@@ -41,7 +42,7 @@ const path: Vec3[] = [
 
 export const cleatHitch: Knot = {
   id: "cleat-hitch",
-  builtinRevision: 2,
+  builtinRevision: 3,
   name: "Cleat Hitch",
   blurb: "도크라인을 혼 클리트에 고정하는 표준 방법. 하중을 받아도 안 풀리고 빠르게 푼다.",
   difficulty: 2,
@@ -54,10 +55,12 @@ export const cleatHitch: Knot = {
   defaultStepDuration: 1.3,
   // 곧은 줄은 클리트 앞 아래쪽에 수평으로 놓고, standing(앞부분)부터 형성.
   layCenter: [0, -0.2, 0.7],
+  // 감은 부분은 클리트 위 제자리, 남은 working end 는 곧게 — 베이스→8자→잠금 진행 포즈.
+  poses: tiePoses(path, [0.3, 0.58, 0.82, 1], { reverse: false, tailDir: [-0.2, 0.2, 1] }),
   steps: [
-    { id: "base", title: "Round the base", instruction: "도크라인을 클리트 먼 쪽 베이스에 한 바퀴 감는다.", reveal: 0.3 },
-    { id: "fig8a", title: "First figure-eight", instruction: "한 뿔 위로 올려 반대 뿔로 대각선 8자를 만든다.", reveal: 0.58 },
-    { id: "fig8b", title: "Second figure-eight", instruction: "되돌아오며 두 번째 대각을 만들어 X 자로 교차시킨다.", reveal: 0.82 },
-    { id: "lock", title: "Locking hitch", instruction: "마지막에 뒤집은 반바퀴(locking hitch)로 끝을 끼워 잠근다.", reveal: 1 },
+    { id: "base", title: "Round the base", instruction: "도크라인을 클리트 먼 쪽 베이스에 한 바퀴 감는다.", reveal: 0.3, camera: { position: [0.5, 1.1, 3.1], target: [0, 0.05, 0] } },
+    { id: "fig8a", title: "First figure-eight", instruction: "한 뿔 위로 올려 반대 뿔로 대각선 8자를 만든다.", reveal: 0.58, camera: { position: [0.5, 1.1, 3.1], target: [0, 0.1, 0] } },
+    { id: "fig8b", title: "Second figure-eight", instruction: "되돌아오며 두 번째 대각을 만들어 X 자로 교차시킨다.", reveal: 0.82, camera: { position: [0.45, 1.05, 3.0], target: [0, 0.12, 0] } },
+    { id: "lock", title: "Locking hitch", instruction: "마지막에 뒤집은 반바퀴(locking hitch)로 끝을 끼워 잠근다.", reveal: 1, camera: { position: [0.4, 1.0, 2.9], target: [0, 0.12, 0] } },
   ],
 };

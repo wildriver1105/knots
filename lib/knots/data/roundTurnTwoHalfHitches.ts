@@ -4,6 +4,7 @@
 
 import type { Knot, Vec3 } from "../types";
 import { helixY, line, join } from "../builder";
+import { tiePoses } from "../authoring";
 
 const RP = 0.5;
 const RR = RP + 0.085;
@@ -37,7 +38,7 @@ const path: Vec3[] = join(standing, roundTurn, hitches);
 
 export const roundTurnTwoHalfHitches: Knot = {
   id: "round-turn-two-half-hitches",
-  builtinRevision: 3,
+  builtinRevision: 4,
   name: "Round Turn & Two Half Hitches",
   blurb: "지속 하중을 견디는 견고한 히치. 무어링 링이나 말뚝에 배를 묶을 때 신뢰도 높다.",
   difficulty: 2,
@@ -50,9 +51,11 @@ export const roundTurnTwoHalfHitches: Knot = {
   layDir: [1, 0, 0],
   layCenter: [0, -0.15, 1.15],
   defaultStepDuration: 1.4,
+  // 감은 부분은 말뚝 위 제자리, 남은 working end 는 곧게 — round turn → half hitch 진행 포즈.
+  poses: tiePoses(path, [0.55, 0.8, 1], { reverse: false, tailDir: [0.3, -0.1, 1] }),
   steps: [
-    { id: "round", title: "Round turn", instruction: "말뚝을 완전히 두 바퀴 감는다 — 마찰이 하중을 받친다.", reveal: 0.55 },
-    { id: "hitch1", title: "First half hitch", instruction: "남은 끝으로 standing part 둘레에 반바퀴 매듭을 건다.", reveal: 0.8 },
-    { id: "hitch2", title: "Second half hitch", instruction: "같은 방향으로 한 번 더 걸어 잠근다.", reveal: 1 },
+    { id: "round", title: "Round turn", instruction: "말뚝을 완전히 두 바퀴 감는다 — 마찰이 하중을 받친다.", reveal: 0.55, camera: { position: [1.6, 0.6, 4.3], target: [0, 0.35, 0.45] } },
+    { id: "hitch1", title: "First half hitch", instruction: "남은 끝으로 standing part 둘레에 반바퀴 매듭을 건다.", reveal: 0.8, camera: { position: [1.5, 0.6, 4.1], target: [0, 0.4, 0.45] } },
+    { id: "hitch2", title: "Second half hitch", instruction: "같은 방향으로 한 번 더 걸어 잠근다.", reveal: 1, camera: { position: [1.4, 0.55, 4.0], target: [0, 0.38, 0.45] } },
   ],
 };

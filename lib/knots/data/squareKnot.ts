@@ -47,7 +47,7 @@ const red: Vec3[] = [
 
 export const squareKnot: Knot = {
   id: "square-knot",
-  builtinRevision: 3,
+  builtinRevision: 4,
   name: "Square (Reef) Knot",
   blurb: "굵기가 같은 두 줄을 잇거나 돛을 묶을 때(reef). 좌상우, 우상좌 — 대칭이라 평평하게 눕는다.",
   difficulty: 1,
@@ -59,9 +59,9 @@ export const squareKnot: Knot = {
   formReverse: false,
   defaultStepDuration: 1.3,
   steps: [
-    { id: "lay", title: "Lay the ropes", instruction: "두 로프 끝을 나란히 놓는다. 왼손 줄(파랑), 오른손 줄(빨강).", reveal: 0.4, camera: { position: [0, 0.25, 5], target: [0, 0, 0] } },
-    { id: "first", title: "Left over right", instruction: "왼쪽 끝을 오른쪽 위로 교차해 한 번 감는다.", reveal: 0.66, camera: { position: [0, 0.25, 5], target: [0, 0, 0] } },
-    { id: "second", title: "Right over left", instruction: "이번엔 오른쪽 끝을 왼쪽 위로 교차해 감는다 — 대칭이 핵심.", reveal: 0.85, camera: { position: [0, 0.25, 5], target: [0, 0, 0] } },
-    { id: "dress", title: "Pull tight", instruction: "같은 색의 두 끝이 같은 쪽으로 나가도록 네 가닥을 당겨 평평하게 정돈한다. 비대칭이면 granny knot다.", reveal: 1, camera: { position: [0, 0.25, 5], target: [0, 0, 0] } },
+    { id: "lay", title: "Lay the ropes", instruction: "두 로프 끝을 나란히 놓는다. 왼손 줄(파랑), 오른손 줄(빨강).", reveal: 0.4, camera: { position: [0.6, 1.9, 3.9], target: [0, 0, 0] } },
+    { id: "first", title: "Left over right", instruction: "왼쪽 끝을 오른쪽 위로 교차해 한 번 감는다.", reveal: 0.66, camera: { position: [0.6, 1.9, 3.9], target: [0, 0, 0] } },
+    { id: "second", title: "Right over left", instruction: "이번엔 오른쪽 끝을 왼쪽 위로 교차해 감는다 — 대칭이 핵심.", reveal: 0.85, camera: { position: [0.6, 1.9, 3.9], target: [0, 0, 0] } },
+    { id: "dress", title: "Pull tight", instruction: "같은 색의 두 끝이 같은 쪽으로 나가도록 네 가닥을 당겨 평평하게 정돈한다. 비대칭이면 granny knot다.", reveal: 1, camera: { position: [0.6, 1.9, 3.9], target: [0, 0, 0] } },
   ],
 };

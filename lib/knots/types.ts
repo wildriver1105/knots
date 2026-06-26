@@ -29,6 +29,23 @@ export interface StepCamera {
   target: Vec3;
 }
 
+/** 도프시트 키프레임 — 한 제어점이 시간 t(0..1)에 위치 pos 를 갖는다. */
+export interface AnimKey {
+  t: number; // 0..1 전역 시간
+  pos: Vec3;
+}
+/** 한 제어점의 키프레임 트랙(t 오름차순, 최소 1개). */
+export interface PointTrack {
+  keys: AnimKey[];
+}
+/**
+ * 점별 키프레임 애니메이션(도프시트). tracks[i] = path 의 i 번째 제어점 트랙.
+ * 있으면 렌더가 poses 대신 이걸 시간으로 평가한다(점마다 독립 타이밍).
+ */
+export interface KnotAnimation {
+  tracks: PointTrack[]; // length === path.length
+}
+
 export interface Step {
   id: string;
   /** 명령형 짧은 제목, 예: "Form the loop". */
@@ -59,7 +76,14 @@ export interface Knot {
    * 추가 가닥(bend 매듭용). square knot 처럼 두 로프를 잇는 매듭은 별도 strand 가 필요하다.
    * main path 와 동일 진행도로 함께 형성된다. layDir 로 곧은 줄의 놓임 방향을 따로 줄 수 있다.
    */
-  extraStrands?: { path: Vec3[]; color: string; layDir?: Vec3; layCenter?: Vec3 }[];
+  extraStrands?: {
+    path: Vec3[];
+    color: string;
+    layDir?: Vec3;
+    layCenter?: Vec3;
+    /** 가닥별 스텝 포즈(있으면 interpolatePoses 로 재생, 없으면 1회 formStaged 시드 폴백). main 과 동일 개수. */
+    poses?: Vec3[][];
+  }[];
 
   // ── morph(형성) 튜닝 ──
   /** 곧게 펴진 줄(straight baseline)의 놓임 방향. 기본 [1,0,0](수평). */
@@ -83,6 +107,12 @@ export interface Knot {
     bendStiffness?: number;
     /** 속도 감쇠. 0..1. */
     damping?: number;
+    /**
+     * 렌더 시 물리 정착 모드. 기본 "off".
+     * "off": 저작 포즈(interpolatePoses)를 그대로 렌더(결정론·재현가능). 실시간 solver 미사용.
+     * "light": form>0.9 부근에서만 겹침을 약하게 정리(중간 형성은 절대 구동하지 않음).
+     */
+    settle?: "off" | "light";
   };
   /** 순서 있는 step 목록. reveal 은 단조 증가, 마지막은 1. */
   steps: Step[];
@@ -92,6 +122,11 @@ export interface Knot {
    * 있으면 애니메이션이 포즈 사이를 보간한다(loose→tight 대신). steps 와 1:1.
    */
   poses?: Vec3[][];
+  /**
+   * 점별 키프레임 애니메이션(도프시트). 있으면 렌더가 poses 보다 이걸 우선해 시간으로 평가한다.
+   * tracks 길이 = path.length. 에디터 도프시트로 저작/편집한다.
+   */
+  animation?: KnotAnimation;
   /** 사용자 정의(에디터) 매듭 여부. */
   isCustom?: boolean;
 }

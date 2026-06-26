@@ -4,6 +4,7 @@
 // 아래에는 큰 고정 고리가 남는다.
 
 import type { Knot, Vec3 } from "../types";
+import { tiePoses } from "../authoring";
 
 const path: Vec3[] = [
   // standing part: 위에서 내려와 매듭으로
@@ -37,7 +38,7 @@ const path: Vec3[] = [
 
 export const bowline: Knot = {
   id: "bowline",
-  builtinRevision: 2,
+  builtinRevision: 3,
   name: "Bowline",
   blurb: "끝에 절대 미끄러지지 않는 고정 고리를 만든다. 하중 후에도 쉽게 풀려 '매듭의 왕'으로 불린다.",
   difficulty: 3,
@@ -49,10 +50,12 @@ export const bowline: Knot = {
   object: { kind: "none" },
   formReverse: false,
   defaultStepDuration: 1.5,
+  // 형성된 부분은 제 위치(구멍→큰 고리), working end 는 곧은 꼬리로 — 토끼가 굴을 드나드는 진행.
+  poses: tiePoses(path, [0.42, 0.62, 0.82, 1], { reverse: false, tailDir: [-0.3, 0.2, 0.6] }),
   steps: [
-    { id: "loop", title: "Make the hole", instruction: "standing part 에 작은 고리(구멍)를 만든다 — 토끼 굴.", reveal: 0.42 },
-    { id: "up", title: "Up through the hole", instruction: "working end 를 구멍 위로 통과시킨다 — 토끼가 나온다.", reveal: 0.62 },
-    { id: "around", title: "Around the tree", instruction: "끝을 standing part 뒤로 돌린다 — 나무를 돈다.", reveal: 0.82 },
-    { id: "down", title: "Back down the hole", instruction: "끝을 다시 구멍으로 내리고 당겨 조인다 — 굴로 돌아간다.", reveal: 1 },
+    { id: "loop", title: "Make the hole", instruction: "standing part 에 작은 고리(구멍)를 만든다 — 토끼 굴.", reveal: 0.42, camera: { position: [0.7, 0.6, 3.6], target: [0.15, 0.1, 0] } },
+    { id: "up", title: "Up through the hole", instruction: "working end 를 구멍 위로 통과시킨다 — 토끼가 나온다.", reveal: 0.62, camera: { position: [0.7, 0.55, 3.6], target: [0.2, 0.15, 0] } },
+    { id: "around", title: "Around the tree", instruction: "끝을 standing part 뒤로 돌린다 — 나무를 돈다.", reveal: 0.82, camera: { position: [0.8, 0.5, 3.7], target: [0.25, 0.15, 0] } },
+    { id: "down", title: "Back down the hole", instruction: "끝을 다시 구멍으로 내리고 당겨 조인다 — 굴로 돌아간다.", reveal: 1, camera: { position: [0.45, 0.15, 4.4], target: [0, -0.25, 0] } },
   ],
 };

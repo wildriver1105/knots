@@ -3,7 +3,7 @@
 // 앱 루트(client). 3D 캔버스(ssr:false)를 동적 임포트하고, 입력 어댑터를 연결하며,
 // 보기/에디터 모드와 오버레이 UI(매듭 선택·단계 패널·컨트롤 바·모드 토글·음성)를 배치한다.
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { useInputAdapters } from "@/lib/player/useInputAdapters";
 import { createKeyboardAdapter } from "@/lib/player/adapters/keyboard";
@@ -19,6 +19,7 @@ import ControlBar from "@/components/ui/ControlBar";
 import ModeToggle from "@/components/ui/ModeToggle";
 import VoiceControl from "@/components/ui/VoiceControl";
 import EditorPanel from "@/components/ui/EditorPanel";
+import TimelinePanel from "@/components/ui/TimelinePanel";
 
 // R3F 캔버스는 SSR 금지 → 동적 임포트.
 const SceneCanvas = dynamic(() => import("@/components/scene/SceneCanvas"), {
@@ -27,7 +28,8 @@ const SceneCanvas = dynamic(() => import("@/components/scene/SceneCanvas"), {
 });
 
 export default function KnotApp() {
-  const [showDebug, setShowDebug] = useState(false);
+  const showDebug = usePlayerStore((s) => s.debugPoints);
+  const toggleDebug = usePlayerStore((s) => s.toggleDebugPoints);
 
   // Phase 1: 키보드 어댑터. (음성은 VoiceControl 토글로 시작)
   const adapters = useMemo(() => [createKeyboardAdapter()], []);
@@ -37,6 +39,14 @@ export default function KnotApp() {
   useEffect(() => {
     validateAllKnots(BUILTIN_SEED);
     void hydrate().then(() => validateAllKnots(useKnotsRepo.getState().knots));
+    // 저작/검증용: dev 에서 스토어를 window 에 노출해 preview eval 로 구동할 수 있게 한다.
+    if (process.env.NODE_ENV !== "production") {
+      (window as unknown as Record<string, unknown>).knots = {
+        player: usePlayerStore,
+        editor: useEditorStore,
+        repo: useKnotsRepo,
+      };
+    }
   }, [hydrate]);
 
   const knotId = usePlayerStore((s) => s.knotId);
@@ -44,6 +54,7 @@ export default function KnotApp() {
   useKnotsRepo((s) => s.loaded);
   const knot = getKnot(knotId);
   const editing = useEditorStore((s) => s.editing);
+  const dope = useEditorStore((s) => s.dope);
 
   return (
     <div className={`app ${editing ? "app--editing" : ""}`}>
@@ -56,7 +67,7 @@ export default function KnotApp() {
         {!editing && (
           <div className="header-tools">
             <VoiceControl />
-            <ModeToggle showDebug={showDebug} onToggleDebug={() => setShowDebug((v) => !v)} />
+            <ModeToggle showDebug={showDebug} onToggleDebug={toggleDebug} />
           </div>
         )}
       </header>
@@ -77,12 +88,19 @@ export default function KnotApp() {
           )}
         </aside>
 
-        {/* 3D 무대 (히어로) */}
-        <div className="stage">
-          <SceneCanvas showDebug={showDebug} />
+        {/* 3D 무대 (히어로) — 데스크톱은 컨트롤 바를 무대 위에 오버레이, 좁은 화면은 무대 아래로 분리. */}
+        <div className="stagecol">
+          <div className="stage">
+            <SceneCanvas showDebug={showDebug} />
+          </div>
           {!editing && (
             <div className="overlay overlay--bottom">
               <ControlBar />
+            </div>
+          )}
+          {editing && dope && (
+            <div className="overlay overlay--bottom">
+              <TimelinePanel />
             </div>
           )}
         </div>

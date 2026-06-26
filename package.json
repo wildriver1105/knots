@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "validate": "tsx scripts/validate-knots.ts"
   },
   "dependencies": {
     "@react-three/drei": "^9.114.0",
@@ -24,6 +25,7 @@
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "@types/three": "^0.169.0",
+    "tsx": "^4.19.2",
     "typescript": "^5"
   }
 }

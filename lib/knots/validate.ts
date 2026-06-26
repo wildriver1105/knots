@@ -47,6 +47,16 @@ export function validateKnot(knot: Knot): string[] {
   ) {
     errors.push(`[${knot.id}] colorSplitIndex=${knot.colorSplitIndex} 가 path 범위 밖`);
   }
+  // 투톤(ropeColorB)을 쓰면 색 경계는 내부 점이어야 두 튜브가 모두 그려진다.
+  if (
+    knot.ropeColorB !== undefined &&
+    knot.colorSplitIndex !== undefined &&
+    (knot.colorSplitIndex <= 0 || knot.colorSplitIndex >= knot.path.length - 1)
+  ) {
+    errors.push(
+      `[${knot.id}] ropeColorB 사용 시 colorSplitIndex 는 (0, path.length-1) 내부여야 함 (현재 ${knot.colorSplitIndex}/${knot.path.length})`
+    );
+  }
   if (!(knot.ropeRadius > 0 && Number.isFinite(knot.ropeRadius))) {
     errors.push(`[${knot.id}] ropeRadius는 0보다 큰 유한수여야 함`);
   }
@@ -60,6 +70,46 @@ export function validateKnot(knot: Knot): string[] {
       }
       pose.forEach((point, pointIndex) => {
         if (!finitePoint(point)) errors.push(`[${knot.id}] poses[${poseIndex}][${pointIndex}] 좌표가 유효하지 않음`);
+      });
+    });
+  }
+  // extraStrand 포즈(있으면): steps 와 개수 일치, 각 포즈 길이 = 해당 가닥 path 길이, 좌표 유한.
+  knot.extraStrands?.forEach((strand, si) => {
+    if (!strand.poses) return;
+    if (strand.poses.length !== knot.steps.length) {
+      errors.push(
+        `[${knot.id}] extraStrands[${si}].poses(${strand.poses.length})와 steps(${knot.steps.length}) 개수가 다름`
+      );
+    }
+    strand.poses.forEach((pose, pi) => {
+      if (pose.length !== strand.path.length) {
+        errors.push(
+          `[${knot.id}] extraStrands[${si}].poses[${pi}] 점 개수(${pose.length})가 path(${strand.path.length})와 다름`
+        );
+      }
+      pose.forEach((point, ci) => {
+        if (!finitePoint(point))
+          errors.push(`[${knot.id}] extraStrands[${si}].poses[${pi}][${ci}] 좌표가 유효하지 않음`);
+      });
+    });
+  });
+  // 도프시트 애니메이션(있으면): 트랙 개수 = path.length, 각 트랙 키 ≥1·t 단조·0..1·유한 pos.
+  if (knot.animation) {
+    const tracks = knot.animation.tracks;
+    if (tracks.length !== knot.path.length) {
+      errors.push(`[${knot.id}] animation.tracks(${tracks.length})가 path(${knot.path.length})와 다름`);
+    }
+    tracks.forEach((track, ti) => {
+      if (!track.keys || track.keys.length < 1) {
+        errors.push(`[${knot.id}] animation.tracks[${ti}] 키가 1개 이상이어야 함`);
+        return;
+      }
+      let prevT = -Infinity;
+      track.keys.forEach((k, ki) => {
+        if (!(k.t >= 0 && k.t <= 1)) errors.push(`[${knot.id}] animation.tracks[${ti}].keys[${ki}].t=${k.t} 가 0..1 밖`);
+        if (k.t < prevT) errors.push(`[${knot.id}] animation.tracks[${ti}].keys[${ki}] t 가 오름차순 아님`);
+        prevT = k.t;
+        if (!finitePoint(k.pos)) errors.push(`[${knot.id}] animation.tracks[${ti}].keys[${ki}].pos 유효하지 않음`);
       });
     });
   }

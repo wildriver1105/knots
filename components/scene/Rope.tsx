@@ -1,8 +1,9 @@
 "use client";
 
-// 매듭 로프 렌더러 (loose→tight 조임 + verlet 물리 + 자기충돌).
-// 줄 전체가 항상 보인다. 시작은 "느슨하지만 알아볼 수 있는 매듭"이고, 형성 진행도를 향해
-// 손 순서대로 조여진다. RopeSolver(중력+스프링+비신축+자기충돌)로 겹침 없이 출렁이며 정착.
+// 매듭 로프 렌더러 (결정론적 포즈 재생).
+// 줄 전체가 항상 보인다. 빌트인·커스텀 모두 스텝 포즈(poses)를 form(0..1)으로 보간(interpolatePoses)해
+// 그대로 렌더한다 — 실시간 물리 solver 는 렌더 경로에 없다(저작 포즈 = 화면, 폭발/구슬/꽈배기 없음).
+// physics.settle === "light" 일 때만 form>0.9 부근에서 겹침을 약하게 정리한다(옵트인).
 //
 // 지오메트리는 useFrame 에서 "직접(imperative)" 갱신한다(React 재렌더 없음) — Canvas 렌더 도중
 // setState 를 호출하면 안 되기 때문. 메시 구조(가닥/투톤/캡)는 매듭이 바뀔 때만 재구성된다.
@@ -12,8 +13,10 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import type { Vec3 } from "@/lib/knots/types";
 import { getKnot } from "@/lib/knots/registry";
-import { sliceCurve, interpolatePoses, knotShape, buildLoose } from "@/lib/knots/interpolate";
-import { RopeSolver, collidersForObject, solverOptionsForKnot } from "@/lib/knots/physics";
+import { interpolatePoses } from "@/lib/knots/interpolate";
+import { sampleAnimation } from "@/lib/knots/anim";
+import { withSeededPoses } from "@/lib/knots/authoring";
+import { collidersForObject, relaxPoints } from "@/lib/knots/physics";
 import { usePlayerStore } from "@/lib/player/store";
 import { makeRopeMaterial } from "./ropeTexture";
 
@@ -78,26 +81,25 @@ export default function Rope() {
   const target =
     mode === "step" ? knot.steps[Math.min(stepIndex, knot.steps.length - 1)].reveal : progress;
 
-  const hasB =
-    knot.ropeColorB != null &&
-    knot.colorSplitIndex != null &&
-    knot.colorSplitIndex > 0 &&
-    knot.colorSplitIndex < knot.path.length - 1;
-  // solver 가 dense 로 리샘플하므로 색 경계는 인덱스가 아니라 "호 비율"로 다룬다.
-  const splitFraction = hasB ? (knot.colorSplitIndex as number) / (knot.path.length - 1) : 0;
-  const extras = knot.extraStrands ?? [];
+  // 결정론적 렌더: 모든 매듭을 poses(키프레임)로 재생한다. path 만 저작된 매듭은 시드로 포즈를 채운다.
+  const posed = useMemo(() => withSeededPoses(knot), [knot]);
+  const extras = posed.extraStrands ?? [];
 
-  // 가닥 path. 빌트인은 tieAlongPath 로 "working end 가 지나간 흔적"을 만들고,
-  // 커스텀은 에디터 keyframe 을 staged interpolation 으로 재생한다.
-  const strands = useMemo(() => {
-    const all = [{ path: knot.path, loose: buildLoose(knot.path) }];
-    extras.forEach((e) => all.push({ path: e.path, loose: buildLoose(e.path) }));
+  const hasB =
+    posed.ropeColorB != null &&
+    posed.colorSplitIndex != null &&
+    posed.colorSplitIndex > 0 &&
+    posed.colorSplitIndex < posed.path.length - 1;
+
+  // 가닥별 스텝 포즈(main + extras). solver 가 없으므로 포즈 점이 곧 제어점 — 색 경계는 인덱스로 다룬다.
+  const strandPoses = useMemo(() => {
+    const all: Vec3[][][] = [posed.poses ?? [posed.path]];
+    extras.forEach((e) => all.push(e.poses ?? [e.path]));
     return all;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [knot]);
+  }, [posed]);
 
-  const solver = useMemo(() => new RopeSolver(r), [knot, r]);
-  const colliders = useMemo(() => collidersForObject(knot.object), [knot]);
+  const colliders = useMemo(() => collidersForObject(posed.object), [posed]);
 
   // 재질(매듭별 1회 생성). 캡도 같은 로프 재질을 써서 끝이 자연스럽게.
   const mats = useMemo(() => {
@@ -127,17 +129,10 @@ export default function Rope() {
   const formRef = useRef(target);
   const prevKnot = useRef<string | null>(null);
 
-  // 매듭 전환 시 solver 스냅
+  // 매듭 전환 시 형성 진행도만 리셋(결정론 — solver 스냅 불필요).
   if (prevKnot.current !== knotId) {
     prevKnot.current = knotId;
     formRef.current = target;
-    const targets = knot.poses
-      ? [interpolatePoses(knot.poses, target, { workingStartIndex: knot.colorSplitIndex, reverse: knot.formReverse })]
-      : strands.map((s) => knotShape(s.loose, s.path, target, knot.formReverse));
-    const restTargets = knot.poses
-      ? [knot.poses[knot.poses.length - 1] ?? knot.path]
-      : strands.map((s) => s.path);
-    solver.snap(targets, restTargets);
   }
 
   // 언마운트 시 지오메트리 정리
@@ -154,23 +149,20 @@ export default function Rope() {
     const d = target - cur;
     formRef.current = Math.abs(d) > 0.0008 ? cur + d * (1 - Math.exp(-7 * Math.min(dt, 0.05))) : target;
     const form = formRef.current;
+    const settle = posed.physics?.settle ?? "off";
 
-    // 커스텀(에디터) 매듭은 working-end staged keyframe 보간,
-    // 빌트인은 working end 가 최종 path 를 따라 지나가는 tying 포즈.
-    const targets = knot.poses
-      ? [interpolatePoses(knot.poses, form, { workingStartIndex: knot.colorSplitIndex, reverse: knot.formReverse })]
-      : strands.map((s) => knotShape(s.loose, s.path, form, knot.formReverse));
-    const result = solver.step(targets, dt, solverOptionsForKnot(knot, form), colliders);
+    // settle="light" 일 때만 거의 완성된 포즈의 겹침을 약하게 정리(중간 형성은 절대 구동 안 함).
+    const settleIf = (pts: Vec3[]) =>
+      settle === "light" && form > 0.9 ? relaxPoints(pts, r, 16, colliders) : pts;
 
-    // 실제 로프처럼 전체 길이를 항상 유지한다. 단계는 잘라내기(reveal)가 아니라
-    // 느슨한 포즈에서 완성 포즈로 이동하고 장력이 올라가는 과정이다.
-    const reveal = 1;
+    // main 가닥 — 도프시트(animation)가 있으면 점별 트랙을 시간으로 평가, 없으면 포즈 보간.
+    const mainInterp = posed.animation
+      ? sampleAnimation(posed.animation, form)
+      : interpolatePoses(strandPoses[0], form, { workingStartIndex: posed.colorSplitIndex, reverse: posed.formReverse });
+    const mainPts = settleIf(mainInterp);
 
-    const mainPts = sliceCurve(result[0], reveal);
-    // 색 경계 = 노출된 호 안에서 splitFraction 위치(없으면 색A 만).
-    const showB = hasB && reveal > splitFraction + 1e-3;
-    const splitIdx = showB ? Math.round((splitFraction / reveal) * (mainPts.length - 1)) : -1;
-    if (showB && splitIdx > 0 && splitIdx < mainPts.length - 1) {
+    const splitIdx = hasB ? Math.min(mainPts.length - 2, Math.max(1, posed.colorSplitIndex as number)) : -1;
+    if (hasB && splitIdx > 0) {
       if (mainBRef.current) mainBRef.current.visible = true;
       setGeom(mainARef.current, mainPts.slice(0, splitIdx + 1), r);
       setGeom(mainBRef.current, mainPts.slice(splitIdx), r);
@@ -181,13 +173,13 @@ export default function Rope() {
     setCap(capSRef.current, mainPts[0]);
     setCap(capERef.current, mainPts[mainPts.length - 1]);
     if (capERef.current) {
-      const tipColor = showB ? knot.ropeColorB! : knot.ropeColor;
+      const tipColor = hasB ? knot.ropeColorB! : knot.ropeColor;
       (capERef.current.material as THREE.MeshStandardMaterial).color.set(tipColor);
     }
 
     for (let k = 0; k < extras.length; k++) {
-      const pts = sliceCurve(result[k + 1], reveal);
-      if (!pts) continue;
+      const pts = settleIf(interpolatePoses(strandPoses[k + 1], form, { reverse: posed.formReverse }));
+      if (!pts || pts.length < 2) continue;
       setGeom(extraStrandRefs.current[k], pts, r);
       setCap(extraCapSRefs.current[k], pts[0]);
       setCap(extraCapERefs.current[k], pts[pts.length - 1]);

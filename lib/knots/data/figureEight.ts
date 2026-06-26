@@ -38,7 +38,7 @@ const path: Vec3[] = [
 
 export const figureEight: Knot = {
   id: "figure-eight",
-  builtinRevision: 3,
+  builtinRevision: 4,
   name: "Figure-Eight",
   blurb:
     "기본 멈춤 매듭(stopper). 로프가 블록·페어리드를 빠져나가지 않게 끝에 묶는다. 풀기 쉽고 절대 엉키지 않는다.",
@@ -52,9 +52,9 @@ export const figureEight: Knot = {
   formReverse: false, // index 0(standing 위)부터 형성
   defaultStepDuration: 1.4,
   steps: [
-    { id: "loop", title: "Make a loop", instruction: "standing part 로 고리를 만든다.", reveal: 0.35 },
-    { id: "around", title: "Around behind", instruction: "working end 를 standing part 뒤로 돌린다.", reveal: 0.6 },
-    { id: "through", title: "Through the loop", instruction: "끝을 고리 안으로 통과시켜 내린다.", reveal: 0.82 },
-    { id: "dress", title: "Dress & tighten", instruction: "양쪽 끝을 당겨 8자 모양으로 정돈해 조인다.", reveal: 1 },
+    { id: "loop", title: "Make a loop", instruction: "standing part 로 고리를 만든다.", reveal: 0.35, camera: { position: [0.5, 0.55, 3.7], target: [0.05, 0.3, 0] } },
+    { id: "around", title: "Around behind", instruction: "working end 를 standing part 뒤로 돌린다.", reveal: 0.6, camera: { position: [0.5, 0.55, 3.7], target: [0.05, 0.3, 0] } },
+    { id: "through", title: "Through the loop", instruction: "끝을 고리 안으로 통과시켜 내린다.", reveal: 0.82, camera: { position: [0.5, 0.5, 3.4], target: [0.1, 0.2, 0] } },
+    { id: "dress", title: "Dress & tighten", instruction: "양쪽 끝을 당겨 8자 모양으로 정돈해 조인다.", reveal: 1, camera: { position: [0.45, 0.45, 3.2], target: [0.1, 0.15, 0] } },
   ],
 };

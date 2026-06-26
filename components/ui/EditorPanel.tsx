@@ -33,6 +33,8 @@ export default function EditorPanel() {
   const preview = useEditorStore((s) => s.preview);
   const previewPlaying = useEditorStore((s) => s.previewPlaying);
   const previewProgress = useEditorStore((s) => s.previewProgress);
+  const dope = useEditorStore((s) => s.dope);
+  const toggleDope = useEditorStore((s) => s.toggleDope);
   const togglePreview = useEditorStore((s) => s.togglePreview);
   const playPreview = useEditorStore((s) => s.playPreview);
   const pausePreview = useEditorStore((s) => s.pausePreview);
@@ -85,6 +87,33 @@ export default function EditorPanel() {
     const id = resetBuiltin();
     if (id) loadKnot(id);
   };
+
+  // 도프시트 모드: 점별 키프레임 편집. 타임라인은 무대 하단 오버레이.
+  if (dope) {
+    return (
+      <div className="editor-panel">
+        <div className="ed-shapehead">
+          <strong>{draft.name}</strong> · 도프시트 (점별 키프레임)
+        </div>
+        <p className="ed-hint">
+          하단 <b>타임라인</b>에서 시간을 옮기고(스크럽), 3D 에서 <b>점을 선택→기즈모로 끌면</b> 그 시간에
+          키프레임이 찍힙니다(autokey). 주황색 점 = 현재 시간에 키가 있는 점. 타임라인의 키(◆)를 드래그하면
+          리타이밍, <b>◆키 추가/◇키 삭제</b>, <b>🧅어니언</b>으로 앞뒤 키를 겹쳐 비교하세요.
+        </p>
+        <div className="ed-row ed-save">
+          <button className="ed-cancel" onClick={toggleDope} title="포즈(스텝) 편집으로 돌아가기">
+            ✎ 포즈 편집
+          </button>
+          <button className="ed-save-ghost" onClick={doSave} title="파일에 저장(에디터 유지)">
+            {saved ? "저장됨 ✓" : "저장"}
+          </button>
+          <button className="ed-save-btn" onClick={saveAndView} title="저장하고 에디터 닫기">
+            저장하고 보기
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // 미리보기 모드: 애니메이션 재생/스크럽만.
   if (preview) {
