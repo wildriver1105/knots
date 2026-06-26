@@ -21,6 +21,12 @@ export function easeInOut(t: number): number {
   return c * c * (3 - 2 * c);
 }
 
+/** 더 부드러운 ease-in-out. 경계에서 가속도까지 완만해 기계적인 끊김이 덜하다. */
+export function smootherStep(t: number): number {
+  const c = Math.min(1, Math.max(0, t));
+  return c * c * c * (c * (c * 6 - 15) + 10);
+}
+
 /**
  * 중심선을 reveal(0..1) 길이만큼 잘라낸다.
  * 마지막 세그먼트는 부분 보간점으로 마감해 끝이 매끄럽게 자라나도록 한다.
@@ -75,6 +81,23 @@ function sub(a: Vec3, b: Vec3): Vec3 {
 
 function scale(v: Vec3, s: number): Vec3 {
   return [v[0] * s, v[1] * s, v[2] * s];
+}
+
+function smoothPolyline(points: Vec3[], passes = 2): Vec3[] {
+  if (points.length < 4 || passes <= 0) return points;
+  let out = points.map((p) => [...p] as Vec3);
+  for (let pass = 0; pass < passes; pass++) {
+    const next: Vec3[] = [[...out[0]] as Vec3];
+    for (let i = 0; i < out.length - 1; i++) {
+      const a = out[i];
+      const b = out[i + 1];
+      next.push(lerpVec3(a, b, 0.25));
+      next.push(lerpVec3(a, b, 0.75));
+    }
+    next.push([...out[out.length - 1]] as Vec3);
+    out = next;
+  }
+  return out;
 }
 
 /** path 의 각 점까지 누적 호 길이와 총 길이. */
@@ -160,7 +183,6 @@ export function tieAlongPath(path: Vec3[], progress: number, reverse = false, ta
   const N = path.length;
   if (N < 2) return path.map((p) => [...p] as Vec3);
   const p = Math.min(1, Math.max(0, progress));
-  if (p >= 0.9999) return path.map((q) => [...q] as Vec3);
 
   const oriented = reverse ? [...path].reverse() : path;
   const { cum, total } = arcLengths(oriented);
@@ -169,21 +191,25 @@ export function tieAlongPath(path: Vec3[], progress: number, reverse = false, ta
   const preferredTail = tailDir ? normalize(tailDir) : tangentAtArc(oriented, cum, front);
   const tangent = tangentAtArc(oriented, cum, front, preferredTail);
   const tail = normalize(add(scale(tangent, 0.72), scale(preferredTail, 0.28)));
-  const blend = Math.max(total * 0.045, 0.001);
+  const blend = Math.max(total * 0.14, 0.001);
+  const sampleCount = Math.max(64, N * 5);
 
-  const out = oriented.map((original, i) => {
-    const s = cum[i];
+  const out = Array.from({ length: sampleCount }, (_, i) => {
+    const s = total * (i / Math.max(1, sampleCount - 1));
+    const original = pointAtArc(oriented, cum, s);
+    if (p >= 0.9999) return original;
     if (s <= front - blend) return [...original] as Vec3;
 
     const straight = add(frontPoint, scale(tail, s - front));
     if (s >= front + blend) return straight;
 
-    // 움직이는 선두 근처만 살짝 섞어 꺾임을 부드럽게 한다.
-    const w = easeInOut((s - (front - blend)) / (blend * 2));
+    // 움직이는 선두 근처를 넓고 부드럽게 섞어 제어점 단위로 딱딱 끊기는 느낌을 줄인다.
+    const w = smootherStep((s - (front - blend)) / (blend * 2));
     return lerpVec3(original, straight, w);
   });
 
-  return reverse ? out.reverse() : out;
+  const smoothed = smoothPolyline(out, 2);
+  return reverse ? smoothed.reverse() : smoothed;
 }
 
 /** 살짝 넘쳤다가 제자리로 돌아오는 ease(잡아당겨 조이는 "탁" 느낌). */
@@ -259,7 +285,7 @@ export function interpolatePoses(
   const t = Math.min(1, Math.max(0, form)) * (K - 1);
   let i = Math.floor(t);
   if (i >= K - 1) i = K - 2;
-  const f = easeInOut(t - i);
+  const f = smootherStep(t - i);
   const a = poses[i];
   const b = poses[i + 1];
   const n = Math.min(a.length, b.length);
@@ -267,7 +293,7 @@ export function interpolatePoses(
   const staged = options.staged ?? true;
   const workingStart = Math.min(n - 1, Math.max(0, options.workingStartIndex ?? Math.floor(n * 0.55)));
   const reverse = options.reverse ?? false;
-  const blend = 0.36;
+  const blend = 0.52;
   for (let j = 0; j < n; j++) {
     if (!staged) {
       out[j] = lerpVec3(a[j], b[j], f);
@@ -288,7 +314,7 @@ export function interpolatePoses(
           ? (j / Math.max(1, workingStart)) * 0.72
           : 0.72 + ((j - workingStart) / Math.max(1, n - 1 - workingStart)) * 0.28;
     }
-    const local = easeInOut(Math.min(1, Math.max(0, (f * (1 + blend) - rank) / blend)));
+    const local = smootherStep(Math.min(1, Math.max(0, (f * (1 + blend) - rank) / blend)));
     out[j] = lerpVec3(a[j], b[j], local);
   }
   return out;

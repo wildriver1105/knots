@@ -132,7 +132,7 @@ body {
   left: 50%;
   bottom: 16px;
   transform: translateX(-50%);
-  width: min(560px, calc(100% - 32px));
+  width: min(760px, calc(100% - 32px));
 }
 
 /* 매듭 설명 */
@@ -309,6 +309,34 @@ body {
   color: var(--text-dim);
   min-width: 44px;
   text-align: right;
+}
+.speed-control {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-left: 4px;
+  border-left: 1px solid var(--stroke);
+}
+.speed-chip {
+  border: 1px solid var(--stroke);
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--text-dim);
+  border-radius: 999px;
+  padding: 5px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.14s;
+}
+.speed-chip:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.09);
+}
+.speed-chip--on {
+  color: #07131d;
+  background: var(--accent-2);
+  border-color: transparent;
 }
 
 /* 매듭 선택 */
@@ -673,6 +701,21 @@ body {
 @media (max-width: 560px) {
   .overlay--bottom {
     width: calc(100% - 24px);
+  }
+  .control-bar {
+    flex-wrap: wrap;
+    border-radius: 22px;
+  }
+  .scrubber {
+    min-width: 160px;
+  }
+  .speed-control {
+    width: 100%;
+    justify-content: center;
+    padding-left: 0;
+    padding-top: 4px;
+    border-left: 0;
+    border-top: 1px solid var(--stroke);
   }
   .rail {
     flex-direction: column;

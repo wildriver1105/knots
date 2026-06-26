@@ -13,17 +13,25 @@ export default function ControlBar() {
   const stepIndex = usePlayerStore((s) => s.stepIndex);
   const progress = usePlayerStore((s) => s.progress);
   const isPlaying = usePlayerStore((s) => s.isPlaying);
+  const playbackRate = usePlayerStore((s) => s.playbackRate);
 
   const togglePlay = usePlayerStore((s) => s.togglePlay);
   const next = usePlayerStore((s) => s.next);
   const prev = usePlayerStore((s) => s.prev);
   const rewind = usePlayerStore((s) => s.rewind);
   const seek = usePlayerStore((s) => s.seek);
+  const setRate = usePlayerStore((s) => s.setRate);
 
   const knot = getKnot(knotId);
   const lastStep = knot.steps.length - 1;
   const curStep = mode === "step" ? stepIndex : progressToStepIndex(knot, progress);
   const position = mode === "step" ? stepIndexToProgress(knot, stepIndex) : progress;
+  const rates = [
+    { value: 0.5, label: "느림" },
+    { value: 1, label: "보통" },
+    { value: 1.5, label: "빠름" },
+    { value: 2, label: "매우 빠름" },
+  ];
 
   return (
     <div className="control-bar">
@@ -55,6 +63,20 @@ export default function ControlBar() {
 
       <div className="step-counter">
         {curStep + 1} / {lastStep + 1}
+      </div>
+
+      <div className="speed-control" aria-label="재생 속도">
+        {rates.map((rate) => (
+          <button
+            key={rate.value}
+            className={`speed-chip ${Math.abs(playbackRate - rate.value) < 0.001 ? "speed-chip--on" : ""}`}
+            onClick={() => setRate(rate.value)}
+            type="button"
+            title={`재생 속도: ${rate.label} (${rate.value}x)`}
+          >
+            {rate.label}
+          </button>
+        ))}
       </div>
     </div>
   );
