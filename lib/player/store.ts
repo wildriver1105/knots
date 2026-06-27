@@ -149,8 +149,11 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     const s = get();
     if (!s.isPlaying || s.mode !== "continuous") return;
     const knot = getKnot(s.knotId);
-    // 전체 시퀀스 길이(초) = step 수 * 기본 duration / rate
-    const totalSeconds = Math.max(0.5, (knot.steps.length - 1) * knot.defaultStepDuration);
+    // 전체 시퀀스 길이(초). 도프시트 애니메이션이 있으면 저장된 animationDuration 을 따라
+    // 에디터에서 본 속도 그대로 재생한다. 아니면 step 수 * 기본 duration.
+    const totalSeconds = knot.animation
+      ? Math.max(0.2, knot.animationDuration ?? (knot.steps.length - 1) * knot.defaultStepDuration)
+      : Math.max(0.5, (knot.steps.length - 1) * knot.defaultStepDuration);
     const dp = (delta * s.playbackRate) / totalSeconds;
     const next = s.progress + dp;
     if (next >= 1) set({ progress: 1, isPlaying: false });
