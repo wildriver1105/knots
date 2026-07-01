@@ -18,11 +18,17 @@ const EASE = 0.6; // 스텝 전환 카메라 이징 시간(초)
 export default function CameraRig() {
   const controls = useRef<OrbitControlsImpl>(null);
   const camera = useThree((s) => s.camera);
+  const size = useThree((s) => s.size);
 
   const knotId = usePlayerStore((s) => s.knotId);
   const mode = usePlayerStore((s) => s.mode);
   const stepIndex = usePlayerStore((s) => s.stepIndex);
   const progress = usePlayerStore((s) => s.progress);
+
+  // 세로(모바일) 화면일수록 매듭이 위쪽에 붙어 보인다 → 카메라 rig 를 위로 평행이동(각도 유지)해
+  // 매듭을 프레임 중앙으로 내린다. 가로(데스크톱) 화면은 0(영향 없음).
+  const aspect = size.width / Math.max(1, size.height);
+  const yLift = THREE.MathUtils.clamp((1.2 - aspect) * 0.9, 0, 0.6);
 
   const remain = useRef(0); // 남은 이징 시간(초)
   const fromPos = useRef(new THREE.Vector3());
@@ -41,8 +47,8 @@ export default function CameraRig() {
     if (cam) {
       fromPos.current.copy(camera.position);
       fromTgt.current.copy(controls.current?.target ?? new THREE.Vector3());
-      toPos.current.set(cam.position[0], cam.position[1], cam.position[2]);
-      toTgt.current.set(cam.target[0], cam.target[1], cam.target[2]);
+      toPos.current.set(cam.position[0], cam.position[1] + yLift, cam.position[2]);
+      toTgt.current.set(cam.target[0], cam.target[1] + yLift, cam.target[2]);
       remain.current = EASE;
     }
   }

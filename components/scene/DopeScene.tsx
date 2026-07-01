@@ -16,44 +16,7 @@ import type { Vec3 } from "@/lib/knots/types";
 import { useEditorStore } from "@/lib/editor/store";
 import { sampleAnimation, keyTimes } from "@/lib/knots/anim";
 import { makeRopeMaterial } from "./ropeTexture";
-
-function smoothCenterline(points: Vec3[], passes: number, factor: number): Vec3[] {
-  let out = points.map((p) => [p[0], p[1], p[2]] as Vec3);
-  for (let pass = 0; pass < passes; pass++) {
-    const next = out.map((p) => [p[0], p[1], p[2]] as Vec3);
-    for (let i = 1; i < out.length - 1; i++) {
-      next[i][0] = out[i][0] * (1 - factor) + (out[i - 1][0] + out[i + 1][0]) * 0.5 * factor;
-      next[i][1] = out[i][1] * (1 - factor) + (out[i - 1][1] + out[i + 1][1]) * 0.5 * factor;
-      next[i][2] = out[i][2] * (1 - factor) + (out[i - 1][2] + out[i + 1][2]) * 0.5 * factor;
-    }
-    out = next;
-  }
-  return out;
-}
-
-function tube(points: Vec3[], radius: number): THREE.TubeGeometry | null {
-  const smooth = smoothCenterline(points, 3, 0.5);
-  const clean: Vec3[] = [];
-  for (const p of smooth) {
-    const last = clean[clean.length - 1];
-    if (!last || Math.hypot(p[0] - last[0], p[1] - last[1], p[2] - last[2]) > radius * 0.2) clean.push(p);
-  }
-  if (clean.length < 2) return null;
-  const v = clean.map((p) => new THREE.Vector3(p[0], p[1], p[2]));
-  const curve = new THREE.CatmullRomCurve3(v, false, "centripetal");
-  const geometry = new THREE.TubeGeometry(curve, Math.min(600, Math.max(64, clean.length * 5)), radius, 28, false);
-  geometry.computeVertexNormals();
-  return geometry;
-}
-
-function setGeom(mesh: THREE.Mesh | null, pts: Vec3[], radius: number) {
-  if (!mesh) return;
-  const g = tube(pts, radius);
-  if (!g) return;
-  const old = mesh.geometry;
-  mesh.geometry = g;
-  old?.dispose();
-}
+import { setTube, setTwoToneTube } from "./ropeTube";
 
 export default function DopeScene() {
   const draft = useEditorStore((s) => s.draft);
@@ -75,24 +38,22 @@ export default function DopeScene() {
   // 마커/기즈모 위치 = 현재 시간 샘플(re-render 시에만 재계산 — useFrame setState 금지).
   const markers = useMemo(() => (anim ? sampleAnimation(anim, playheadT) : []), [anim, playheadT]);
 
-  const mats = useMemo(
-    () => ({
-      A: makeRopeMaterial(draft?.ropeColor ?? "#e0584b"),
-      B: makeRopeMaterial(draft?.ropeColorB ?? "#3f8fce"),
+  const mats = useMemo(() => {
+    const A = makeRopeMaterial(draft?.ropeColor ?? "#e0584b");
+    const B = makeRopeMaterial(draft?.ropeColorB ?? "#3f8fce");
+    return {
+      tube: [A, B], // 단일 튜브 + 그룹(투톤). 단색이면 그룹 없어 A 만 사용.
       ghost: new THREE.MeshStandardMaterial({ color: "#9fb3c8", transparent: true, opacity: 0.16, roughness: 0.9, depthWrite: false }),
-    }),
-    [draft?.ropeColor, draft?.ropeColorB]
-  );
+    };
+  }, [draft?.ropeColor, draft?.ropeColorB]);
 
-  const tubeARef = useRef<THREE.Mesh>(null);
-  const tubeBRef = useRef<THREE.Mesh>(null);
+  const tubeRef = useRef<THREE.Mesh>(null);
   const ghostPrevRef = useRef<THREE.Mesh>(null);
   const ghostNextRef = useRef<THREE.Mesh>(null);
 
   useEffect(() => {
     return () => {
-      tubeARef.current?.geometry?.dispose();
-      tubeBRef.current?.geometry?.dispose();
+      tubeRef.current?.geometry?.dispose();
       ghostPrevRef.current?.geometry?.dispose();
       ghostNextRef.current?.geometry?.dispose();
     };
@@ -106,15 +67,9 @@ export default function DopeScene() {
     const t = st.playheadT;
     const pts = sampleAnimation(a, t);
 
-    const splitIdx = hasB ? Math.min(pts.length - 2, Math.max(1, split)) : -1;
-    if (hasB && splitIdx > 0) {
-      if (tubeBRef.current) tubeBRef.current.visible = true;
-      setGeom(tubeARef.current, pts.slice(0, splitIdx + 1), r);
-      setGeom(tubeBRef.current, pts.slice(splitIdx), r);
-    } else {
-      if (tubeBRef.current) tubeBRef.current.visible = false;
-      setGeom(tubeARef.current, pts, r);
-    }
+    // 하나의 연속 튜브 + 색 경계 그룹 분할(곡선 끊김 없음).
+    if (hasB) setTwoToneTube(tubeRef.current, pts, r, split / Math.max(1, pts.length - 1));
+    else setTube(tubeRef.current, pts, r);
 
     // 어니언 스킨: 재생헤드 양쪽 가장 가까운 키 시각의 줄 고스트.
     if (st.onion && !st.dopePlaying) {
@@ -123,11 +78,11 @@ export default function DopeScene() {
       const nextT = times.find((x) => x > t + 1e-3);
       if (ghostPrevRef.current) {
         ghostPrevRef.current.visible = prevT !== undefined;
-        if (prevT !== undefined) setGeom(ghostPrevRef.current, sampleAnimation(a, prevT), r);
+        if (prevT !== undefined) setTube(ghostPrevRef.current, sampleAnimation(a, prevT), r);
       }
       if (ghostNextRef.current) {
         ghostNextRef.current.visible = nextT !== undefined;
-        if (nextT !== undefined) setGeom(ghostNextRef.current, sampleAnimation(a, nextT), r);
+        if (nextT !== undefined) setTube(ghostNextRef.current, sampleAnimation(a, nextT), r);
       }
     } else {
       if (ghostPrevRef.current) ghostPrevRef.current.visible = false;
@@ -142,8 +97,7 @@ export default function DopeScene() {
 
   return (
     <group>
-      <mesh ref={tubeARef} material={mats.A} castShadow receiveShadow />
-      <mesh ref={tubeBRef} material={mats.B} castShadow receiveShadow />
+      <mesh ref={tubeRef} material={mats.tube} castShadow receiveShadow />
       <mesh ref={ghostPrevRef} material={mats.ghost} />
       <mesh ref={ghostNextRef} material={mats.ghost} />
 

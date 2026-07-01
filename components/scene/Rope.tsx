@@ -19,56 +19,7 @@ import { withSeededPoses } from "@/lib/knots/authoring";
 import { collidersForObject, relaxPoints } from "@/lib/knots/physics";
 import { usePlayerStore } from "@/lib/player/store";
 import { makeRopeMaterial } from "./ropeTexture";
-
-// 중심선 라플라시안 스무딩 — 자기충돌이 만든 고주파 지그재그(구슬/꽈배기)를 펴서
-// 줄이 매끈하게 보이게 한다. 끝점은 고정.
-function smoothCenterline(points: Vec3[], passes: number, factor: number): Vec3[] {
-  let out = points.map((p) => [p[0], p[1], p[2]] as Vec3);
-  for (let pass = 0; pass < passes; pass++) {
-    const next = out.map((p) => [p[0], p[1], p[2]] as Vec3);
-    for (let i = 1; i < out.length - 1; i++) {
-      const avgX = (out[i - 1][0] + out[i + 1][0]) * 0.5;
-      const avgY = (out[i - 1][1] + out[i + 1][1]) * 0.5;
-      const avgZ = (out[i - 1][2] + out[i + 1][2]) * 0.5;
-      next[i][0] = out[i][0] * (1 - factor) + avgX * factor;
-      next[i][1] = out[i][1] * (1 - factor) + avgY * factor;
-      next[i][2] = out[i][2] * (1 - factor) + avgZ * factor;
-    }
-    out = next;
-  }
-  return out;
-}
-
-function buildTube(points: Vec3[], radius: number): THREE.TubeGeometry | null {
-  // 충돌로 생긴 울퉁불퉁함을 펴고, 겹친(0길이) 점 제거(centripetal CatmullRom NaN 방지).
-  const smooth = smoothCenterline(points, 3, 0.5);
-  const clean: Vec3[] = [];
-  for (const p of smooth) {
-    const last = clean[clean.length - 1];
-    if (!last || Math.hypot(p[0] - last[0], p[1] - last[1], p[2] - last[2]) > radius * 0.2) clean.push(p);
-  }
-  if (clean.length < 2) return null;
-  const v = clean.map((p) => new THREE.Vector3(p[0], p[1], p[2]));
-  const curve = new THREE.CatmullRomCurve3(v, false, "centripetal");
-  const seg = Math.min(600, Math.max(64, clean.length * 5));
-  const geometry = new THREE.TubeGeometry(curve, seg, radius, 28, false);
-  geometry.computeVertexNormals();
-  return geometry;
-}
-
-function setGeom(mesh: THREE.Mesh | null, pts: Vec3[], radius: number) {
-  if (!mesh) return;
-  const g = buildTube(pts, radius);
-  if (!g) return;
-  const old = mesh.geometry;
-  mesh.geometry = g;
-  old?.dispose();
-}
-
-function setCap(mesh: THREE.Mesh | null, at: Vec3 | undefined) {
-  if (!mesh || !at) return;
-  mesh.position.set(at[0], at[1], at[2]);
-}
+import { setTube, setTwoToneTube, setCap } from "./ropeTube";
 
 export default function Rope() {
   const knotId = usePlayerStore((s) => s.knotId);
@@ -90,6 +41,8 @@ export default function Rope() {
     posed.colorSplitIndex != null &&
     posed.colorSplitIndex > 0 &&
     posed.colorSplitIndex < posed.path.length - 1;
+  // 색 경계를 호 비율로(하나의 연속 튜브에서 그룹 분할).
+  const splitFraction = hasB ? (posed.colorSplitIndex as number) / (posed.path.length - 1) : 0;
 
   // 가닥별 스텝 포즈(main + extras). solver 가 없으므로 포즈 점이 곧 제어점 — 색 경계는 인덱스로 다룬다.
   const strandPoses = useMemo(() => {
@@ -103,9 +56,13 @@ export default function Rope() {
 
   // 재질(매듭별 1회 생성). 캡도 같은 로프 재질을 써서 끝이 자연스럽게.
   const mats = useMemo(() => {
-    const m = {
-      mainA: makeRopeMaterial(knot.ropeColor),
-      mainB: hasB ? makeRopeMaterial(knot.ropeColorB!) : null,
+    const mainA = makeRopeMaterial(knot.ropeColor);
+    const mainB = hasB ? makeRopeMaterial(knot.ropeColorB!) : null;
+    return {
+      mainA,
+      mainB,
+      // 단일 메시 머티리얼: 투톤이면 [A,B] 배열(지오메트리 그룹으로 구분), 아니면 단색.
+      main: hasB && mainB ? [mainA, mainB] : mainA,
       capA: makeRopeMaterial(knot.ropeColor),
       capB: makeRopeMaterial(hasB ? knot.ropeColorB! : knot.ropeColor),
       extra: extras.map((e) => ({
@@ -113,13 +70,11 @@ export default function Rope() {
         cap: makeRopeMaterial(e.color),
       })),
     };
-    return m;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [knot, hasB]);
 
   // 메시 refs
-  const mainARef = useRef<THREE.Mesh>(null);
-  const mainBRef = useRef<THREE.Mesh>(null);
+  const mainRef = useRef<THREE.Mesh>(null);
   const capSRef = useRef<THREE.Mesh>(null);
   const capERef = useRef<THREE.Mesh>(null);
   const extraStrandRefs = useRef<(THREE.Mesh | null)[]>([]);
@@ -138,8 +93,7 @@ export default function Rope() {
   // 언마운트 시 지오메트리 정리
   useEffect(() => {
     return () => {
-      mainARef.current?.geometry?.dispose();
-      mainBRef.current?.geometry?.dispose();
+      mainRef.current?.geometry?.dispose();
       extraStrandRefs.current.forEach((m) => m?.geometry?.dispose());
     };
   }, [knot]);
@@ -161,15 +115,9 @@ export default function Rope() {
       : interpolatePoses(strandPoses[0], form, { workingStartIndex: posed.colorSplitIndex, reverse: posed.formReverse });
     const mainPts = settleIf(mainInterp);
 
-    const splitIdx = hasB ? Math.min(mainPts.length - 2, Math.max(1, posed.colorSplitIndex as number)) : -1;
-    if (hasB && splitIdx > 0) {
-      if (mainBRef.current) mainBRef.current.visible = true;
-      setGeom(mainARef.current, mainPts.slice(0, splitIdx + 1), r);
-      setGeom(mainBRef.current, mainPts.slice(splitIdx), r);
-    } else {
-      if (mainBRef.current) mainBRef.current.visible = false;
-      setGeom(mainARef.current, mainPts, r);
-    }
+    // 하나의 연속 튜브로 그리고, 투톤이면 색 경계에서 그룹만 분할(곡선은 끊김 없이 이어짐).
+    if (hasB) setTwoToneTube(mainRef.current, mainPts, r, splitFraction);
+    else setTube(mainRef.current, mainPts, r);
     setCap(capSRef.current, mainPts[0]);
     setCap(capERef.current, mainPts[mainPts.length - 1]);
     if (capERef.current) {
@@ -180,7 +128,7 @@ export default function Rope() {
     for (let k = 0; k < extras.length; k++) {
       const pts = settleIf(interpolatePoses(strandPoses[k + 1], form, { reverse: posed.formReverse }));
       if (!pts || pts.length < 2) continue;
-      setGeom(extraStrandRefs.current[k], pts, r);
+      setTube(extraStrandRefs.current[k], pts, r);
       setCap(extraCapSRefs.current[k], pts[0]);
       setCap(extraCapERefs.current[k], pts[pts.length - 1]);
     }
@@ -190,8 +138,7 @@ export default function Rope() {
 
   return (
     <group>
-      <mesh ref={mainARef} material={mats.mainA} castShadow receiveShadow />
-      {hasB && <mesh ref={mainBRef} material={mats.mainB!} castShadow receiveShadow />}
+      <mesh ref={mainRef} material={mats.main} castShadow receiveShadow />
       <mesh ref={capSRef} geometry={capGeo} material={mats.capA} castShadow />
       <mesh ref={capERef} geometry={capGeo} material={mats.capB} castShadow />
 

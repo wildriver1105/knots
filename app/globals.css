@@ -54,6 +54,7 @@ body {
   gap: 14px;
   padding: 12px 20px 6px;
   flex: 0 0 auto;
+  flex-wrap: wrap; /* 좁은 화면: 도구가 안 들어가면 둘째 줄로 흐른다(글자 세로 깨짐 방지). */
 }
 .brand {
   display: flex;
@@ -192,6 +193,7 @@ body {
   border-radius: 9px;
   cursor: pointer;
   transition: all 0.16s;
+  white-space: nowrap; /* "연속 재생" 이 세로로 깨지지 않게. */
 }
 .seg-btn--on {
   background: var(--accent);
@@ -356,6 +358,8 @@ body {
   padding: 8px 14px 14px;
   overflow-x: auto;
   scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch; /* iOS 관성 스크롤 */
+  scroll-snap-type: x proximity;
 }
 .knot-card {
   flex: 0 0 auto;
@@ -372,6 +376,7 @@ body {
   cursor: pointer;
   text-align: left;
   transition: all 0.16s;
+  scroll-snap-align: start;
 }
 .knot-card:hover {
   border-color: var(--stroke-strong);
@@ -423,6 +428,8 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 .voice-btn {
   display: inline-flex;
@@ -679,6 +686,12 @@ body {
 
 /* ── 반응형(태블릿/좁은 화면) ── */
 @media (max-width: 900px) {
+  /* 좁은 화면: 콘텐츠(무대+컨트롤+단계+선택기)가 화면보다 길면 페이지가 스크롤되게.
+     (고정 100dvh 로 두면 내용이 겹친다.) */
+  .app {
+    height: auto;
+    min-height: 100dvh;
+  }
   .main {
     flex-direction: column;
     gap: 10px;
@@ -687,9 +700,10 @@ body {
   .stagecol {
     display: contents;
   }
+  /* 정해진 높이(min-height 아님) — 그래야 R3F 캔버스의 height:100% 가 무너지지 않고 무대를 채운다. */
   .stage {
-    flex: 1 1 auto;
-    min-height: 52vh;
+    flex: 0 0 auto;
+    height: 52vh;
   }
   /* 좁은 화면: 컨트롤 바를 무대 위 오버레이 대신 무대 아래 일반 흐름으로 — 매듭을 가리지 않게. */
   .overlay--bottom {
@@ -757,6 +771,54 @@ body {
     flex-direction: column;
     gap: 2px;
     padding: 0 14px 10px;
+  }
+}
+
+/* ── 모바일(폰) 다듬기 — 헤더 컴팩트, 저작/키보드 안내 숨김, 터치 타깃 확대 ── */
+@media (max-width: 560px) {
+  .app-header {
+    padding: 10px 12px 4px;
+    gap: 8px;
+  }
+  .header-tools {
+    gap: 6px;
+  }
+  .seg-btn {
+    padding: 8px 11px;
+    font-size: 12.5px;
+  }
+  .voice-btn {
+    padding: 8px 10px;
+    font-size: 12px;
+    max-width: 128px;
+  }
+  /* 제어점 디버그(points)는 저작용 — 폰에선 숨겨 헤더를 비운다. */
+  .dbg-btn {
+    display: none;
+  }
+  .knot-picker {
+    padding: 8px 12px 12px;
+  }
+  .knot-card {
+    min-width: 138px;
+  }
+  /* 키보드 단축키 안내는 터치 환경에서 불필요 → 숨김. */
+  .app-footer {
+    display: none;
+  }
+  /* 터치 타깃 확대(최소 ~44px 권장). */
+  .ctrl-btn {
+    width: 44px;
+    height: 44px;
+  }
+  .ctrl-btn--primary {
+    width: 52px;
+    height: 52px;
+  }
+  .seg-btn,
+  .voice-btn,
+  .knot-card {
+    min-height: 40px;
   }
 }
 
