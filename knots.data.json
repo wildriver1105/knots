@@ -1,7 +1,7 @@
 [
   {
     "id": "figure-eight",
-    "builtinRevision": 4,
+    "builtinRevision": 5,
     "name": "Figure-Eight",
     "blurb": "기본 멈춤 매듭(stopper). 로프가 블록·페어리드를 빠져나가지 않게 끝에 묶는다. 풀기 쉽고 절대 엉키지 않는다.",
     "difficulty": 1,
@@ -120,6 +120,14 @@
       "kind": "none"
     },
     "formReverse": false,
+    "tieMotion": {
+      "reverse": false,
+      "tailDir": [
+        0.55,
+        -0.2,
+        0.35
+      ]
+    },
     "defaultStepDuration": 1.4,
     "steps": [
       {
@@ -198,7 +206,7 @@
   },
   {
     "id": "square-knot",
-    "builtinRevision": 4,
+    "builtinRevision": 5,
     "name": "Square (Reef) Knot",
     "blurb": "굵기가 같은 두 줄을 잇거나 돛을 묶을 때(reef). 좌상우, 우상좌 — 대칭이라 평평하게 눕는다.",
     "difficulty": 1,
@@ -340,13 +348,19 @@
             0
           ]
         ],
-        "color": "#e0584b"
+        "color": "#e0584b",
+        "tieMotion": {
+          "reverse": false
+        }
       }
     ],
     "object": {
       "kind": "none"
     },
     "formReverse": false,
+    "tieMotion": {
+      "reverse": false
+    },
     "defaultStepDuration": 1.3,
     "steps": [
       {
@@ -425,7 +439,7 @@
   },
   {
     "id": "cleat-hitch",
-    "builtinRevision": 3,
+    "builtinRevision": 4,
     "name": "Cleat Hitch",
     "blurb": "도크라인을 혼 클리트에 고정하는 표준 방법. 하중을 받아도 안 풀리고 빠르게 푼다.",
     "difficulty": 2,
@@ -1030,6 +1044,14 @@
         ]
       ]
     ],
+    "tieMotion": {
+      "reverse": false,
+      "tailDir": [
+        -0.2,
+        0.2,
+        1
+      ]
+    },
     "steps": [
       {
         "id": "base",
@@ -1107,7 +1129,7 @@
   },
   {
     "id": "clove-hitch",
-    "builtinRevision": 5,
+    "builtinRevision": 6,
     "name": "Clove Hitch",
     "blurb": "말뚝·레일에 빠르게 매고 푸는 히치. 페인더/펜더를 임시로 고정할 때 흔히 쓴다.",
     "difficulty": 1,
@@ -3794,6 +3816,14 @@
         ]
       ]
     ],
+    "tieMotion": {
+      "reverse": false,
+      "tailDir": [
+        0.3,
+        -0.1,
+        1
+      ]
+    },
     "steps": [
       {
         "id": "approach",
@@ -3871,7 +3901,7 @@
   },
   {
     "id": "round-turn-two-half-hitches",
-    "builtinRevision": 4,
+    "builtinRevision": 5,
     "name": "Round Turn & Two Half Hitches",
     "blurb": "지속 하중을 견디는 견고한 히치. 무어링 링이나 말뚝에 배를 묶을 때 신뢰도 높다.",
     "difficulty": 2,
@@ -6046,6 +6076,14 @@
         ]
       ]
     ],
+    "tieMotion": {
+      "reverse": false,
+      "tailDir": [
+        0.3,
+        -0.1,
+        1
+      ]
+    },
     "steps": [
       {
         "id": "round",
@@ -6105,7 +6143,7 @@
   },
   {
     "id": "bowline",
-    "builtinRevision": 3,
+    "builtinRevision": 4,
     "name": "Bowline",
     "blurb": "끝에 절대 미끄러지지 않는 고정 고리를 만든다. 하중 후에도 쉽게 풀려 '매듭의 왕'으로 불린다.",
     "difficulty": 3,
@@ -6705,6 +6743,14 @@
         ]
       ]
     ],
+    "tieMotion": {
+      "reverse": false,
+      "tailDir": [
+        -0.3,
+        0.2,
+        0.6
+      ]
+    },
     "steps": [
       {
         "id": "loop",

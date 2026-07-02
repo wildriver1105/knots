@@ -47,16 +47,18 @@ const red: Vec3[] = [
 
 export const squareKnot: Knot = {
   id: "square-knot",
-  builtinRevision: 4,
+  builtinRevision: 5,
   name: "Square (Reef) Knot",
   blurb: "굵기가 같은 두 줄을 잇거나 돛을 묶을 때(reef). 좌상우, 우상좌 — 대칭이라 평평하게 눕는다.",
   difficulty: 1,
   path: blue,
   ropeColor: "#3f8fce",
   ropeRadius: 0.082,
-  extraStrands: [{ path: red, color: "#e0584b" }],
+  // 두 손이 동시에 움직이듯 파랑·빨강 모두 자기 경로를 따라 꿰어 들어간다.
+  extraStrands: [{ path: red, color: "#e0584b", tieMotion: { reverse: false } }],
   object: { kind: "none" },
   formReverse: false,
+  tieMotion: { reverse: false },
   defaultStepDuration: 1.3,
   steps: [
     { id: "lay", title: "Lay the ropes", instruction: "두 로프 끝을 나란히 놓는다. 왼손 줄(파랑), 오른손 줄(빨강).", reveal: 0.4, camera: { position: [0.6, 1.9, 3.9], target: [0, 0, 0] } },

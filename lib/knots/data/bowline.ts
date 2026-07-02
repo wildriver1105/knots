@@ -38,7 +38,7 @@ const path: Vec3[] = [
 
 export const bowline: Knot = {
   id: "bowline",
-  builtinRevision: 3,
+  builtinRevision: 4,
   name: "Bowline",
   blurb: "끝에 절대 미끄러지지 않는 고정 고리를 만든다. 하중 후에도 쉽게 풀려 '매듭의 왕'으로 불린다.",
   difficulty: 3,
@@ -52,6 +52,8 @@ export const bowline: Knot = {
   defaultStepDuration: 1.5,
   // 형성된 부분은 제 위치(구멍→큰 고리), working end 는 곧은 꼬리로 — 토끼가 굴을 드나드는 진행.
   poses: tiePoses(path, [0.42, 0.62, 0.82, 1], { reverse: false, tailDir: [-0.3, 0.2, 0.6] }),
+  // 재생은 연속 스레딩(토끼가 굴에서 나와 나무를 도는 순서 그대로).
+  tieMotion: { reverse: false, tailDir: [-0.3, 0.2, 0.6] },
   steps: [
     { id: "loop", title: "Make the hole", instruction: "standing part 에 작은 고리(구멍)를 만든다 — 토끼 굴.", reveal: 0.42, camera: { position: [0.7, 0.6, 3.6], target: [0.15, 0.1, 0] } },
     { id: "up", title: "Up through the hole", instruction: "working end 를 구멍 위로 통과시킨다 — 토끼가 나온다.", reveal: 0.62, camera: { position: [0.7, 0.55, 3.6], target: [0.2, 0.15, 0] } },

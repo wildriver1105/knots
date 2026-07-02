@@ -58,6 +58,18 @@ export interface Step {
   camera?: StepCamera;
 }
 
+/**
+ * "경로 따라 꿰기" 타잉 모션 — working end 가 최종 path 를 따라 실제로 스레딩되는
+ * 연속 재생(사람이 묶는 순서). 형성된 부분은 최종 위치에 고정되고, 남은 부분은
+ * 진행 선두에서 곧게 뻗은 꼬리로 표현된다(tieAlongPath). form(0..1) == reveal.
+ */
+export interface TieMotion {
+  /** true 면 path 의 끝(index N-1)부터 스레딩. */
+  reverse?: boolean;
+  /** 아직 안 꿴 꼬리가 향할 방향 힌트(생략 시 경로 접선). */
+  tailDir?: Vec3;
+}
+
 export interface Knot {
   id: KnotId | string; // 빌트인 KnotId 또는 커스텀 매듭 id
   /** 빌트인 데이터 교정 버전. 파일 저장소의 오래된 데모를 안전하게 마이그레이션한다. */
@@ -83,6 +95,8 @@ export interface Knot {
     layCenter?: Vec3;
     /** 가닥별 스텝 포즈(있으면 interpolatePoses 로 재생, 없으면 1회 formStaged 시드 폴백). main 과 동일 개수. */
     poses?: Vec3[][];
+    /** 이 가닥의 "경로 따라 꿰기" 모션(있으면 poses 대신 tieAlongPath 스레딩 재생). */
+    tieMotion?: TieMotion;
   }[];
 
   // ── morph(형성) 튜닝 ──
@@ -114,6 +128,13 @@ export interface Knot {
      */
     settle?: "off" | "light";
   };
+  /**
+   * main 가닥의 "경로 따라 꿰기" 모션. 있으면(그리고 animation 이 없으면) 재생이
+   * interpolatePoses 대신 tieAlongPath(path, form) 스레딩을 쓴다 — 사람이 묶는 순서.
+   * 이때 form 은 곧 reveal 이라 step.reveal 체크포인트와 정확히 일치한다.
+   * 에디터에서 poses 를 손수 고쳐 저장하면 이 필드는 제거된다(포즈가 정본이 됨).
+   */
+  tieMotion?: TieMotion;
   /** 순서 있는 step 목록. reveal 은 단조 증가, 마지막은 1. */
   steps: Step[];
 

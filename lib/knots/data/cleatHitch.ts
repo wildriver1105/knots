@@ -42,7 +42,7 @@ const path: Vec3[] = [
 
 export const cleatHitch: Knot = {
   id: "cleat-hitch",
-  builtinRevision: 3,
+  builtinRevision: 4,
   name: "Cleat Hitch",
   blurb: "도크라인을 혼 클리트에 고정하는 표준 방법. 하중을 받아도 안 풀리고 빠르게 푼다.",
   difficulty: 2,
@@ -57,6 +57,8 @@ export const cleatHitch: Knot = {
   layCenter: [0, -0.2, 0.7],
   // 감은 부분은 클리트 위 제자리, 남은 working end 는 곧게 — 베이스→8자→잠금 진행 포즈.
   poses: tiePoses(path, [0.3, 0.58, 0.82, 1], { reverse: false, tailDir: [-0.2, 0.2, 1] }),
+  // 재생은 연속 스레딩(사람이 감는 순서). poses 는 에디터 편집 기준선으로 유지.
+  tieMotion: { reverse: false, tailDir: [-0.2, 0.2, 1] },
   steps: [
     { id: "base", title: "Round the base", instruction: "도크라인을 클리트 먼 쪽 베이스에 한 바퀴 감는다.", reveal: 0.3, camera: { position: [0.5, 1.1, 3.1], target: [0, 0.05, 0] } },
     { id: "fig8a", title: "First figure-eight", instruction: "한 뿔 위로 올려 반대 뿔로 대각선 8자를 만든다.", reveal: 0.58, camera: { position: [0.5, 1.1, 3.1], target: [0, 0.1, 0] } },

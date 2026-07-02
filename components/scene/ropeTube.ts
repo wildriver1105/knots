@@ -23,7 +23,35 @@ export function smoothCenterline(points: Vec3[], passes: number, factor: number)
 
 const RADIAL = 28;
 
-/** 점 배열 → 하나의 매끈한 CatmullRom 튜브(겹친 점 제거로 NaN 방지). */
+// 실제 laid rope 의 3가닥 나선 꼬임 — 노멀맵 착시가 아니라 튜브 단면 자체를 변위시켜
+// 실루엣·음영이 진짜 꼬임으로 나온다. 중심선은 그대로라 "직선인데 꼬여 보이는" 착시가 없다.
+const STRANDS = 3;
+const TWIST_AMP = 0.09; // 반경 대비 가닥 골 깊이
+const LAY_PER_DIAMETER = 5.2; // 꼬임 1회전당 길이 ≈ 지름의 배수(실물 로프 비율)
+
+function applyStrandTwist(geometry: THREE.TubeGeometry, curve: THREE.CatmullRomCurve3, radius: number, seg: number) {
+  const pos = geometry.attributes.position;
+  const arcLen = curve.getLength();
+  const twists = Math.min(64, Math.max(4, Math.round(arcLen / (radius * 2 * LAY_PER_DIAMETER))));
+  const ringCenter = new THREE.Vector3();
+  const v = new THREE.Vector3();
+  for (let i = 0; i <= seg; i++) {
+    curve.getPointAt(i / seg, ringCenter);
+    const phase = (i / seg) * twists * Math.PI * 2;
+    for (let j = 0; j <= RADIAL; j++) {
+      const idx = i * (RADIAL + 1) + j;
+      v.set(pos.getX(idx), pos.getY(idx), pos.getZ(idx)).sub(ringCenter);
+      // TubeGeometry 의 radial 정점은 각도 균일 배치 → θ = j/RADIAL * 2π.
+      const theta = (j / RADIAL) * Math.PI * 2;
+      const f = 1 + TWIST_AMP * Math.cos(STRANDS * theta - phase);
+      v.multiplyScalar(f).add(ringCenter);
+      pos.setXYZ(idx, v.x, v.y, v.z);
+    }
+  }
+  pos.needsUpdate = true;
+}
+
+/** 점 배열 → 하나의 매끈한 CatmullRom 튜브(겹친 점 제거로 NaN 방지) + 3가닥 꼬임 단면. */
 export function buildTube(points: Vec3[], radius: number): THREE.TubeGeometry | null {
   // 결정론 모델에선 입력 점이 이미 깔끔하므로 라플라시안은 아주 약하게만(저작 점을 거의 그대로 통과).
   // 부드러운 곡선은 centripetal CatmullRom 이 책임진다. (과한 스무딩은 줄을 저작 위치에서 끌어당김.)
@@ -38,6 +66,7 @@ export function buildTube(points: Vec3[], radius: number): THREE.TubeGeometry | 
   const curve = new THREE.CatmullRomCurve3(v, false, "centripetal");
   const seg = Math.min(600, Math.max(64, clean.length * 5));
   const geometry = new THREE.TubeGeometry(curve, seg, radius, RADIAL, false);
+  applyStrandTwist(geometry, curve, radius, seg);
   geometry.computeVertexNormals();
   return geometry;
 }

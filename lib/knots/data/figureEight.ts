@@ -38,7 +38,7 @@ const path: Vec3[] = [
 
 export const figureEight: Knot = {
   id: "figure-eight",
-  builtinRevision: 4,
+  builtinRevision: 5,
   name: "Figure-Eight",
   blurb:
     "기본 멈춤 매듭(stopper). 로프가 블록·페어리드를 빠져나가지 않게 끝에 묶는다. 풀기 쉽고 절대 엉키지 않는다.",
@@ -50,6 +50,8 @@ export const figureEight: Knot = {
   ropeRadius: 0.07,
   object: { kind: "none" },
   formReverse: false, // index 0(standing 위)부터 형성
+  // 사람이 묶는 순서: working end 가 최종 경로를 따라 실제로 꿰어 들어간다(스레딩 재생).
+  tieMotion: { reverse: false, tailDir: [0.55, -0.2, 0.35] },
   defaultStepDuration: 1.4,
   steps: [
     { id: "loop", title: "Make a loop", instruction: "standing part 로 고리를 만든다.", reveal: 0.35, camera: { position: [0.5, 0.55, 3.7], target: [0.05, 0.3, 0] } },

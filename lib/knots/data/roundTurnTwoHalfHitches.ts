@@ -38,7 +38,7 @@ const path: Vec3[] = join(standing, roundTurn, hitches);
 
 export const roundTurnTwoHalfHitches: Knot = {
   id: "round-turn-two-half-hitches",
-  builtinRevision: 4,
+  builtinRevision: 5,
   name: "Round Turn & Two Half Hitches",
   blurb: "지속 하중을 견디는 견고한 히치. 무어링 링이나 말뚝에 배를 묶을 때 신뢰도 높다.",
   difficulty: 2,
@@ -53,6 +53,8 @@ export const roundTurnTwoHalfHitches: Knot = {
   defaultStepDuration: 1.4,
   // 감은 부분은 말뚝 위 제자리, 남은 working end 는 곧게 — round turn → half hitch 진행 포즈.
   poses: tiePoses(path, [0.55, 0.8, 1], { reverse: false, tailDir: [0.3, -0.1, 1] }),
+  // 재생은 연속 스레딩(사람이 감는 순서). poses 는 에디터 편집 기준선으로 유지.
+  tieMotion: { reverse: false, tailDir: [0.3, -0.1, 1] },
   steps: [
     { id: "round", title: "Round turn", instruction: "말뚝을 완전히 두 바퀴 감는다 — 마찰이 하중을 받친다.", reveal: 0.55, camera: { position: [1.6, 0.6, 4.3], target: [0, 0.35, 0.45] } },
     { id: "hitch1", title: "First half hitch", instruction: "남은 끝으로 standing part 둘레에 반바퀴 매듭을 건다.", reveal: 0.8, camera: { position: [1.5, 0.6, 4.1], target: [0, 0.4, 0.45] } },

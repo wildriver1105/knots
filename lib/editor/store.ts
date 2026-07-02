@@ -388,7 +388,10 @@ export const useEditorStore = create<EditorState>((set, get) => {
       const d = get().draft;
       if (!d) return null;
       // 도프시트가 있으면 path 를 최종(t=1) 포즈로 동기화(색경계/카메라용), 아니면 기존 스텝 동기화.
-      const synced = d.animation ? { ...d, path: finalPoseOfAnimation(d.animation) } : syncCustomKnot(d);
+      // 에디터에서 저장하면 포즈/애니메이션이 정본 — tieMotion(경로 스레딩 재생)은 제거해
+      // 사용자가 고친 좌표가 그대로 재생되게 한다.
+      const base = d.animation ? { ...d, path: finalPoseOfAnimation(d.animation) } : syncCustomKnot(d);
+      const synced = { ...base, tieMotion: undefined };
       void useKnotsRepo.getState().upsert(synced);
       set({ draft: synced });
       return synced.id;

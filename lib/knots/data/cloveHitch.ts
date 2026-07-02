@@ -31,7 +31,7 @@ const path: Vec3[] = join(tailIn, turn1, cross, turn2, tuck, tailOut);
 
 export const cloveHitch: Knot = {
   id: "clove-hitch",
-  builtinRevision: 5,
+  builtinRevision: 6,
   name: "Clove Hitch",
   blurb: "말뚝·레일에 빠르게 매고 푸는 히치. 페인더/펜더를 임시로 고정할 때 흔히 쓴다.",
   difficulty: 1,
@@ -47,6 +47,8 @@ export const cloveHitch: Knot = {
   defaultStepDuration: 1.4,
   // 감은 부분은 말뚝 위 제자리, 아직 안 감은 working end 는 곧게 — "줄을 따라 꿰는" 진행 포즈.
   poses: tiePoses(path, [0.38, 0.55, 0.82, 1], { reverse: false, tailDir: [0.3, -0.1, 1] }),
+  // 재생은 연속 스레딩(사람이 감는 순서). poses 는 에디터 편집 기준선으로 유지.
+  tieMotion: { reverse: false, tailDir: [0.3, -0.1, 1] },
   steps: [
     { id: "approach", title: "First wrap", instruction: "working end 를 말뚝 뒤로 한 바퀴 감는다.", reveal: 0.38, camera: { position: [1.5, 0.3, 4.2], target: [0, -0.1, 0.35] } },
     { id: "cross", title: "Cross diagonally", instruction: "끝을 앞면에서 대각선으로 교차시켜 위로 올린다.", reveal: 0.55, camera: { position: [1.5, 0.3, 4.2], target: [0, -0.05, 0.35] } },

@@ -100,13 +100,21 @@ export function getRopeTextures() {
   return cached;
 }
 
-/** 공유 로프 재질 — 색만 선명하게 읽히는 매끈한 무광 로프. */
+/**
+ * 공유 로프 재질 — 무광 섬유 로프.
+ * 거시적 꼬임은 ropeTube 의 3가닥 지오메트리가 담당하고, 여기서는 나선이 아닌
+ * "길이 방향 섬유" 노멀/러프니스만 약하게 얹는다(직선이 꼬여 보이는 착시 없음).
+ */
 export function makeRopeMaterial(color: string): THREE.MeshStandardMaterial {
   const base = new THREE.Color(color);
+  const { normalMap, roughnessMap } = getRopeTextures();
   return new THREE.MeshStandardMaterial({
     color: base,
-    roughness: 1,
+    roughness: 0.96,
     metalness: 0,
-    envMapIntensity: 0.08,
+    normalMap,
+    normalScale: new THREE.Vector2(0.55, 0.55),
+    roughnessMap,
+    envMapIntensity: 0.12,
   });
 }

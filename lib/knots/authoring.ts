@@ -10,7 +10,7 @@ import type { Knot, Vec3 } from "./types";
 import { buildStraightBaseline, formStaged, tieAlongPath } from "./interpolate";
 
 // 폴리라인을 호 길이 균일하게 정확히 count 개 점으로 리샘플(포즈 길이를 path.length 로 맞추는 용).
-function resampleToCount(points: Vec3[], count: number): Vec3[] {
+export function resamplePolyline(points: Vec3[], count: number): Vec3[] {
   if (points.length <= 1) return Array.from({ length: count }, () => [...(points[0] ?? [0, 0, 0])] as Vec3);
   const cum = [0];
   for (let i = 1; i < points.length; i++) {
@@ -65,7 +65,7 @@ export function tiePoses(
   opts?: { reverse?: boolean; tailDir?: Vec3 }
 ): Vec3[][] {
   return reveals.map((r) =>
-    resampleToCount(tieAlongPath(path, r, opts?.reverse ?? false, opts?.tailDir), path.length)
+    resamplePolyline(tieAlongPath(path, r, opts?.reverse ?? false, opts?.tailDir), path.length)
   );
 }
 

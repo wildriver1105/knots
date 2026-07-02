@@ -5,12 +5,14 @@
 
 ## 핵심 모델 (반드시 지킬 것)
 
-- **애니메이션은 결정론적이다.** 빌트인·커스텀 모두 스텝 포즈(`Knot.poses` = 스텝당 줄 전체 좌표)를
-  `interpolatePoses` 로 보간해 **그대로 렌더**한다. 저작한 포즈가 곧 화면이다.
-- **렌더 경로에 실시간 물리 solver 가 없다.** 과거 `RopeSolver`(Verlet/자기충돌)를 매 프레임 돌려
-  매듭을 "형성"하던 방식은 폭발·구슬·꽈배기 같은 비결정론적 이상함의 원인이라 제거했다.
-  `RopeSolver`/`relaxPoints` 는 **오프라인 저작 보조**(에디터 `물리 정리`, `physics.settle="light"`
-  옵트인)로만 남아 있다. **렌더 루프에 solver 를 다시 넣지 말 것.**
+- **애니메이션은 결정론적이다.** 재생 소스 우선순위: ① `animation`(도프시트 점별 키프레임)
+  ② `tieMotion`(working end 가 최종 path 를 따라 꿰어 들어가는 스레딩 — 빌트인 기본, form==reveal)
+  ③ `poses`(스텝 포즈 `interpolatePoses`). 저작한 데이터가 곧 화면이다.
+- **렌더 경로에 "상태 있는" 실시간 물리 solver 가 없다.** 과거 `RopeSolver`(Verlet, 누적 상태)를 매
+  프레임 돌려 매듭을 "형성"하던 방식은 폭발·구슬·꽈배기의 원인이라 제거했다. `RopeSolver`/`relaxPoints`
+  는 **오프라인 저작 보조**로만 남아 있다. **렌더 루프에 상태 있는 solver 를 다시 넣지 말 것.**
+  (허용된 것: `lib/knots/depenetrate.ts` — 같은 입력→같은 출력, 보정 클램프된 **무상태** 겹침 분리
+  후처리. 이는 스무딩과 같은 급의 cosmetic 패스로, Verlet 솔버와 혼동하지 말 것.)
 - 매듭 데이터의 정본은 `lib/knots/data/<id>.ts`(타입드 TS). 런타임은 `knots.data.json`(프로젝트 루트
   파일)에서 읽고, 빌트인은 `builtinRevision` 으로 마이그레이션된다. **빌트인을 수정하면 그 파일의
   `builtinRevision` 을 반드시 올릴 것**(안 올리면 저장본이 갱신되지 않는다).
